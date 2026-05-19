@@ -2,6 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parseSlug } from '../lib/slug.js';
 import { extractDescription, renderSkillMd } from '../lib/skill.js';
+import { recordInstall } from '../lib/telemetry.js';
+import { readCliVersion } from '../lib/version.js';
 
 const DEFAULT_API_URL = 'http://localhost';
 const SKILLS_SUBPATH = '.claude/skills/heartcraft';
@@ -53,6 +55,19 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
   await mkdir(dirname(heartPath), { recursive: true });
   await writeFile(heartPath, body, 'utf8');
   await writeFile(skillMdPath, renderSkillMd({ user, name }), 'utf8');
+
+  // telemetry: fire-and-forget。recordInstall は内部で例外を握りつぶす設計だが、
+  // readCliVersion などここでの例外も install 自体の成否に影響させない。
+  try {
+    const cliVersion = await readCliVersion();
+    await recordInstall({
+      slug: `${user}/${name}`,
+      apiUrl,
+      cliVersion,
+    });
+  } catch {
+    // noop
+  }
 
   return { heartPath, skillMdPath, description };
 }

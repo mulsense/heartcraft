@@ -73,4 +73,53 @@ describe('runInstall', () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it('POSTs telemetry after writing files', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/installs')) {
+        return new Response('', { status: 201 });
+      }
+      return new Response(HEART_BODY, { status: 200 });
+    });
+
+    await runInstall({
+      slug: 'tanaka/zundamon',
+      baseDir: tmp,
+      apiUrl: 'http://stub',
+    });
+
+    const telemetryCall = fetchSpy.mock.calls.find((call) => {
+      const u = call[0];
+      return typeof u === 'string' && u.includes('/api/installs');
+    });
+    expect(telemetryCall).toBeDefined();
+
+    const [url, init] = telemetryCall as [string, RequestInit];
+    expect(url).toBe('http://stub/api/installs');
+    expect(init.method).toBe('POST');
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body.heart_id).toBe('tanaka/zundamon');
+    expect(body.machine_hash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('still succeeds when telemetry POST fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/installs')) {
+        throw new Error('ECONNREFUSED');
+      }
+      return new Response(HEART_BODY, { status: 200 });
+    });
+
+    const result = await runInstall({
+      slug: 'tanaka/zundamon',
+      baseDir: tmp,
+      apiUrl: 'http://stub',
+    });
+
+    expect(result.description).toBe('明るく元気なずんだもん人格');
+    const heart = await readFile(join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md'), 'utf8');
+    expect(heart).toBe(HEART_BODY);
+  });
 });

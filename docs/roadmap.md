@@ -7,17 +7,18 @@
 
 ## 現在のバージョン
 
-**v0.0.1（pre-alpha）** — `install` サブコマンドのみ実装、実機 E2E 検証済。
+**v0.1.0（pre-alpha）** — `install` サブコマンド + install telemetry 送信。
 
 検証済の事実：
 - ✅ API → frontmatter Markdown 取得
 - ✅ `.claude/skills/heartcraft/<user>/<name>.md` への配置
 - ✅ `SKILL.md` 生成によるアクティブ化
 - ✅ 新規 Claude Code セッションで人格が適用される
+- ✅ install 成功時に `POST /api/installs` を fire-and-forget で送信（KPI 計測）
 
 ---
 
-## 次の作業（v0.1.0 想定）
+## 次の作業（v0.2.0 想定）
 
 サーバ側 [sprints.md](../../HeartCraftLab/docs/sprints.md) の **Phase E** に対応する CLI 側タスク群：
 
@@ -27,7 +28,6 @@
 | `list` 実装 | `.claude/skills/heartcraft/` のディレクトリスキャン + アクティブ表示 | spec.md §2 |
 | `uninstall` 実装 | ファイル削除 + 参照クリア | spec.md §2 |
 | `search` 実装 | サーバ `GET /api/hearts/search?q=...` を叩く（要サーバ側実装） | サーバ spec §5.3 |
-| telemetry 送信 | `POST /api/installs` を install 時に叩く | サーバ spec §5.3 |
 | API バージョンチェック | レスポンスヘッダ `X-Heartcraft-Api-Version` を確認し、サポート外なら警告 | spec.md §5 |
 
 ---

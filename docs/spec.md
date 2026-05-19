@@ -1,6 +1,6 @@
 # heartcraft CLI 仕様
 
-**バージョン**：v0.0.1（pre-alpha）
+**バージョン**：v0.1.0（pre-alpha）
 **対応サーバ API**：v1
 **source of truth**：本ドキュメント（CLI 側の挙動）／API 契約の正は [../HeartCraftLab/docs/spec.md](../../HeartCraftLab/docs/spec.md) §5.3
 
@@ -39,6 +39,7 @@ MVP では `install` のみ実装済。他は順次。
 4. **保存**：`.claude/skills/heartcraft/<user>/<name>.md` にレスポンス body をそのまま書く（frontmatter 込み）
 5. **SKILL.md 生成**：アクティブ Heart 参照を含む SKILL.md を毎回フル再生成
 6. **成功表示**：`✓ <slug> をインストールしました（<description>）` + 配置パス
+7. **telemetry 送信（best-effort）**：`POST ${HEARTCRAFT_API_URL}/api/installs` を fire-and-forget で叩く。失敗・タイムアウト（2秒）しても install 自体は成功扱いで、出力にも現れない。詳細は §10。
 
 ---
 
@@ -141,6 +142,67 @@ CLI が `process.exit(1)` する場合は必ず `✗ <理由>` を stderr に出
 | atomic write（破壊事故防止） | 未実装、Phase E2 系で追加 |
 | dry-run モード | 未実装 |
 | バックアップ作成 | 未実装 |
-| telemetry 送信 | サーバ側仕様あり、CLI 未実装 |
+| telemetry 送信 | ✅ 実装済（§10） |
 | API バージョンミスマッチ警告 | 未実装 |
 | 認証付き private Heart 取得 | MVP では不要（public のみ） |
+
+---
+
+## 10. Install Telemetry
+
+install 成功時に `POST /api/installs` を fire-and-forget で叩き、サーバ側でユニーク install 数を集計する（KPI）。
+
+### 送信タイミング
+
+`install` フローの **最後**（heart ファイル書き込み + SKILL.md 生成完了後）。
+ユーザーへの成功表示には影響しない（telemetry の成否は出力しない）。
+
+### Payload
+
+| 項目 | 値 |
+|---|---|
+| URL | `${HEARTCRAFT_API_URL}/api/installs` |
+| Method | `POST` |
+| Content-Type | `application/json` |
+
+```json
+{
+  "heart_id": "<user>/<name>",
+  "machine_hash": "<sha256 hex 64>",
+  "cli_version": "<package.json version>",
+  "os": "darwin | linux | win32"
+}
+```
+
+`machine_hash` は `sha256(machineId + "<user>/<name>")`。`heart_id` を mix することで、横断的なマシン追跡を不可能にしつつ「同一マシン × 同一 Heart」のみ uniq 判定できるようにする。
+
+### machineId 取得
+
+[`node-machine-id`](https://www.npmjs.com/package/node-machine-id) を使用：
+- macOS：`ioreg`
+- Linux：`/etc/machine-id` or `/var/lib/dbus/machine-id`
+- Windows：レジストリ `MachineGuid`
+
+取得失敗時は telemetry をスキップ（ランダム値で代用しない → KPI が歪む）。
+
+### 失敗時の方針：fire-and-forget
+
+| 状況 | 挙動 |
+|---|---|
+| ネットワーク失敗 | silent skip。install は成功で終了 |
+| 4xx / 5xx | silent skip |
+| タイムアウト | `AbortController` で **2 秒 hard timeout** |
+| 不正な OS（freebsd 等）| silent skip（サーバ enum は `darwin / linux / win32` のみ） |
+| 不正な slug / cliVersion | silent skip（サーバを 422 で困らせない） |
+
+CLI が固まる・install が失敗する余地を絶対に作らない。
+
+### プライバシー
+
+- machineId 原文はサーバに送らない（sha256 ハッシュ後のみ送信）
+- Heart ごとに hash が異なる → 横断的マシン追跡を不可能にする
+- 取得失敗時はスキップ → ユーザー環境を強制しない
+
+### opt-out
+
+MVP では `--no-telemetry` フラグは入れない。将来必要になったら追加する。

@@ -1,6 +1,6 @@
 {
   "name": "heartcraft",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Install AI personality prompts (Hearts) from HeartCraftLab into your Claude Code skills.",
   "type": "module",
   "main": "dist/cli.js",
@@ -22,7 +22,8 @@
     "node": ">=18"
   },
   "dependencies": {
-    "commander": "^14.0.0"
+    "commander": "^14.0.0",
+    "node-machine-id": "^1.1.12"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

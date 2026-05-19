@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { installCommand } from './commands/install.js';
+import { readCliVersion } from './lib/version.js';
 
 const program = new Command();
 
 program
   .name('heartcraft')
   .description('AI 人格プロンプト（Heart）を Claude Code に導入する CLI')
-  .version('0.0.1');
+  .version(await readCliVersion());
 
 program
   .command('install <slug>')
