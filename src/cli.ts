@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { installCommand } from './commands/install.js';
+import { clearCommand } from './commands/clear.js';
+import { useCommand } from './commands/use.js';
 import { readCliVersion } from './lib/version.js';
 
 const program = new Command();
@@ -11,9 +12,14 @@ program
   .version(await readCliVersion());
 
 program
-  .command('install <slug>')
-  .description('Heart をサーバから取得して .claude/skills/heartcraft/ に配置する')
-  .action(installCommand);
+  .command('use <slug>')
+  .description('Heart をアクティブ化する。ローカルに無ければサーバから取得して配置する')
+  .action(useCommand);
+
+program
+  .command('clear')
+  .description('SKILL.md のアクティブ Heart 参照を解除する（配置済みファイルは残す）')
+  .action(clearCommand);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   const message = err instanceof Error ? err.message : String(err);

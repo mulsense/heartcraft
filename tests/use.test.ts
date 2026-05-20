@@ -1,8 +1,8 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runInstall } from '../src/commands/install.js';
+import { runUse } from '../src/commands/use.js';
 
 const HEART_BODY = `---
 name: zundamon
@@ -16,7 +16,7 @@ version: 1
 あなたはずんだもんなのだ。
 `;
 
-describe('runInstall', () => {
+describe('runUse', () => {
   let tmp: string;
 
   beforeEach(async () => {
@@ -28,17 +28,18 @@ describe('runInstall', () => {
     vi.restoreAllMocks();
   });
 
-  it('writes the heart file and SKILL.md', async () => {
+  it('downloads and writes the heart file + SKILL.md when local file is missing', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(HEART_BODY, { status: 200, headers: { 'Content-Type': 'text/markdown' } }),
     );
 
-    const result = await runInstall({
+    const result = await runUse({
       slug: 'tanaka/zundamon',
       baseDir: tmp,
       apiUrl: 'http://stub',
     });
 
+    expect(result.downloaded).toBe(true);
     expect(result.description).toBe('明るく元気なずんだもん人格');
 
     const heart = await readFile(join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md'), 'utf8');
@@ -48,11 +49,38 @@ describe('runInstall', () => {
     expect(skill).toContain('**tanaka/zundamon.md**');
   });
 
+  it('skips download when the heart file already exists locally', async () => {
+    const existing = '---\nname: zundamon\n---\n\n# already here\n';
+    const heartPath = join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md');
+    await mkdir(dirname(heartPath), { recursive: true });
+    await writeFile(heartPath, existing, 'utf8');
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const result = await runUse({
+      slug: 'tanaka/zundamon',
+      baseDir: tmp,
+      apiUrl: 'http://stub',
+    });
+
+    expect(result.downloaded).toBe(false);
+    expect(result.description).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    // 既存の Heart 本体は触らない
+    const heart = await readFile(heartPath, 'utf8');
+    expect(heart).toBe(existing);
+
+    // SKILL.md は新規生成されて参照が書き換わっている
+    const skill = await readFile(join(tmp, '.claude/skills/heartcraft/SKILL.md'), 'utf8');
+    expect(skill).toContain('**tanaka/zundamon.md**');
+  });
+
   it('throws on 404 with a clear message', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 404 }));
 
     await expect(
-      runInstall({ slug: 'noone/nothing', baseDir: tmp, apiUrl: 'http://stub' }),
+      runUse({ slug: 'noone/nothing', baseDir: tmp, apiUrl: 'http://stub' }),
     ).rejects.toThrowError(/Heart not found: noone\/nothing/);
   });
 
@@ -60,7 +88,7 @@ describe('runInstall', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
 
     await expect(
-      runInstall({ slug: 'tanaka/zundamon', baseDir: tmp, apiUrl: 'http://stub' }),
+      runUse({ slug: 'tanaka/zundamon', baseDir: tmp, apiUrl: 'http://stub' }),
     ).rejects.toThrowError(/Cannot reach HeartCraftLab API/);
   });
 
@@ -68,13 +96,13 @@ describe('runInstall', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
     await expect(
-      runInstall({ slug: 'BAD-CASE/x', baseDir: tmp, apiUrl: 'http://stub' }),
+      runUse({ slug: 'BAD-CASE/x', baseDir: tmp, apiUrl: 'http://stub' }),
     ).rejects.toThrowError(/Invalid user name/);
 
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('POSTs telemetry after writing files', async () => {
+  it('POSTs telemetry when a download actually ran', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('/api/installs')) {
@@ -83,7 +111,7 @@ describe('runInstall', () => {
       return new Response(HEART_BODY, { status: 200 });
     });
 
-    await runInstall({
+    await runUse({
       slug: 'tanaka/zundamon',
       baseDir: tmp,
       apiUrl: 'http://stub',
@@ -103,6 +131,22 @@ describe('runInstall', () => {
     expect(body.machine_hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it('does NOT POST telemetry when the download was skipped', async () => {
+    const heartPath = join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md');
+    await mkdir(dirname(heartPath), { recursive: true });
+    await writeFile(heartPath, HEART_BODY, 'utf8');
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    await runUse({
+      slug: 'tanaka/zundamon',
+      baseDir: tmp,
+      apiUrl: 'http://stub',
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it('still succeeds when telemetry POST fails', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = typeof input === 'string' ? input : input.toString();
@@ -112,12 +156,13 @@ describe('runInstall', () => {
       return new Response(HEART_BODY, { status: 200 });
     });
 
-    const result = await runInstall({
+    const result = await runUse({
       slug: 'tanaka/zundamon',
       baseDir: tmp,
       apiUrl: 'http://stub',
     });
 
+    expect(result.downloaded).toBe(true);
     expect(result.description).toBe('明るく元気なずんだもん人格');
     const heart = await readFile(join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md'), 'utf8');
     expect(heart).toBe(HEART_BODY);

@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parseSlug } from '../lib/slug.js';
 import { extractDescription, renderSkillMd } from '../lib/skill.js';
@@ -8,7 +8,7 @@ import { readCliVersion } from '../lib/version.js';
 const DEFAULT_API_URL = 'http://localhost';
 const SKILLS_SUBPATH = '.claude/skills/heartcraft';
 
-export interface InstallOptions {
+export interface UseOptions {
   slug: string;
   /** Heart ファイルを書き出すベースディレクトリ。デフォルトは process.cwd()。 */
   baseDir?: string;
@@ -16,17 +16,41 @@ export interface InstallOptions {
   apiUrl?: string;
 }
 
-export interface InstallResult {
+export interface UseResult {
   heartPath: string;
   skillMdPath: string;
-  description: string;
+  /** ローカルに Heart ファイルが無くて DL が走ったかどうか。 */
+  downloaded: boolean;
+  /** DL したときは frontmatter から取り出した description。DL スキップ時は null。 */
+  description: string | null;
 }
 
-/** install サブコマンドの本体。副作用は file system のみ。 */
-export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** use サブコマンドの本体。副作用は file system + fetch のみ。 */
+export async function runUse(opts: UseOptions): Promise<UseResult> {
   const { user, name } = parseSlug(opts.slug);
   const baseDir = opts.baseDir ?? process.cwd();
   const apiUrl = (opts.apiUrl ?? process.env.HEARTCRAFT_API_URL ?? DEFAULT_API_URL).replace(/\/$/, '');
+
+  const skillsDir = resolve(baseDir, SKILLS_SUBPATH);
+  const heartPath = join(skillsDir, user, `${name}.md`);
+  const skillMdPath = join(skillsDir, 'SKILL.md');
+
+  // ローカルに既に Heart ファイルがある場合は DL せず SKILL.md だけ書き換える。
+  // telemetry も送らない（DL があった時のみ送信）。
+  if (await fileExists(heartPath)) {
+    await mkdir(skillsDir, { recursive: true });
+    await writeFile(skillMdPath, renderSkillMd({ user, name }), 'utf8');
+    return { heartPath, skillMdPath, downloaded: false, description: null };
+  }
 
   const url = `${apiUrl}/api/hearts/${encodeURIComponent(user)}/${encodeURIComponent(name)}`;
 
@@ -48,16 +72,12 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
   const body = await res.text();
   const description = extractDescription(body);
 
-  const skillsDir = resolve(baseDir, SKILLS_SUBPATH);
-  const heartPath = join(skillsDir, user, `${name}.md`);
-  const skillMdPath = join(skillsDir, 'SKILL.md');
-
   await mkdir(dirname(heartPath), { recursive: true });
   await writeFile(heartPath, body, 'utf8');
   await writeFile(skillMdPath, renderSkillMd({ user, name }), 'utf8');
 
   // telemetry: fire-and-forget。recordInstall は内部で例外を握りつぶす設計だが、
-  // readCliVersion などここでの例外も install 自体の成否に影響させない。
+  // readCliVersion などここでの例外も use 自体の成否に影響させない。
   try {
     const cliVersion = await readCliVersion();
     await recordInstall({
@@ -69,14 +89,19 @@ export async function runInstall(opts: InstallOptions): Promise<InstallResult> {
     // noop
   }
 
-  return { heartPath, skillMdPath, description };
+  return { heartPath, skillMdPath, downloaded: true, description };
 }
 
 /** commander action 用の薄いラッパー */
-export async function installCommand(slug: string): Promise<void> {
-  const result = await runInstall({ slug });
-  const descLabel = result.description !== '' ? `（${result.description}）` : '';
-  console.log(`✓ ${slug} をインストールしました${descLabel}`);
-  console.log(`  - ${result.heartPath}`);
+export async function useCommand(slug: string): Promise<void> {
+  const result = await runUse({ slug });
+  if (result.downloaded) {
+    const descLabel = result.description !== null && result.description !== '' ? `（${result.description}）` : '';
+    console.log(`✓ ${slug} をインストールしました${descLabel}`);
+    console.log(`  - ${result.heartPath}`);
+    console.log(`  - ${result.skillMdPath}（アクティブ Heart を更新）`);
+    return;
+  }
+  console.log(`✓ ${slug} に切り替えました`);
   console.log(`  - ${result.skillMdPath}（アクティブ Heart を更新）`);
 }

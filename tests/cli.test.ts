@@ -20,8 +20,9 @@ describe('heartcraft CLI', () => {
     expect(out.trim()).toBe(pkgVersion);
   });
 
-  it('lists install in help output', () => {
+  it('lists use and clear in help output', () => {
     const out = runCli(['--help']);
-    expect(out).toContain('install');
+    expect(out).toContain('use');
+    expect(out).toContain('clear');
   });
 });
