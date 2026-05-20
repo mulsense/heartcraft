@@ -31,7 +31,7 @@ MVP では `use` 系を実装。`list` / `search` は MVP 対象外（Phase 2 �
 
 ### use のフロー
 
-1. **slug パース**：`<user>/<name>` 形式、両セグメントが `^[a-z0-9][a-z0-9_-]*$` にマッチすることを確認
+1. **slug パース**：`<user>/<name>` 形式、両セグメントが `^[a-z0-9]([a-z0-9_-]*[a-z0-9])?$`（先頭・末尾は英数字）にマッチすることを確認
 2. **エージェント検知**：`cwd` 直下の marker file/dir をスキャンして利用中の AI エージェント群を判定（§3）。1 つも検知されなければ Claude Code をフォールバックとして使う
 3. **ローカル存在チェック**：検知された agent のいずれかの heartPath に `<user>/<name>.md` が既に存在する場合、その内容を読んで再利用し、手順 4 をスキップ
 4. **API 呼び出し**：`GET ${HEARTCRAFT_API_URL}/api/hearts/${user}/${name}`

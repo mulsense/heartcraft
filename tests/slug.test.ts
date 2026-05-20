@@ -32,4 +32,9 @@ describe('parseSlug', () => {
     expect(() => parseSlug('-tanaka/zundamon')).toThrowError(/Invalid user name/);
     expect(() => parseSlug('tanaka/_zundamon')).toThrowError(/Invalid heart name/);
   });
+
+  it('rejects trailing dash or underscore', () => {
+    expect(() => parseSlug('tanaka-/zundamon')).toThrowError(/Invalid user name/);
+    expect(() => parseSlug('tanaka/zundamon_')).toThrowError(/Invalid heart name/);
+  });
 });

@@ -1,4 +1,4 @@
-const NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
+const NAME_PATTERN = /^[a-z0-9]([a-z0-9_-]*[a-z0-9])?$/;
 
 export interface HeartSlug {
   user: string;
