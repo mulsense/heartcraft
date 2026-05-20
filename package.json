@@ -16,7 +16,31 @@
     "build": "tsc",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "prompt",
+    "persona",
+    "heartcraft",
+    "cli",
+    "skills"
+  ],
+  "author": "mulsense",
+  "license": "MIT",
+  "homepage": "https://heartcraftlab.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mulsense/heartcraft.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mulsense/heartcraft/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=18"
