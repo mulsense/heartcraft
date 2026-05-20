@@ -1,7 +1,7 @@
 {
   "name": "heartcraft",
   "version": "0.1.0",
-  "description": "Install AI personality prompts (Hearts) from HeartCraftLab into your Claude Code skills.",
+  "description": "Install AI personality prompts from HeartCraftLab into your Claude Code skills.",
   "type": "module",
   "main": "dist/cli.js",
   "bin": {
