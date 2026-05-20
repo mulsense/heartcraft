@@ -1,9 +1,7 @@
 # Install Telemetry 送信機能
 
 **ステータス**：未実装（要件整理のみ）
-**サーバ側**：実装済 ✅（HeartCraftLab Phase E3 / commit 範囲：`/api/installs` エンドポイント）
-**対応 sprint**：[../../HeartCraftLab/docs/sprints.md](../../HeartCraftLab/docs/sprints.md) Phase E3
-**API 契約**：[../../HeartCraftLab/docs/spec.md](../../HeartCraftLab/docs/spec.md) §6.5
+**サーバ側**：実装済 ✅（`/api/installs` エンドポイント）
 
 ---
 
@@ -216,15 +214,6 @@ try {
 
 ---
 
-## 関連
-
-- サーバ側エンドポイント実装：[../../HeartCraftLab/app/Http/Controllers/Api/HeartInstallController.php](../../HeartCraftLab/app/Http/Controllers/Api/HeartInstallController.php)
-- サーバ側 Form Request：[../../HeartCraftLab/app/Http/Requests/Api/RecordHeartInstallRequest.php](../../HeartCraftLab/app/Http/Requests/Api/RecordHeartInstallRequest.php)
-- サーバ側テスト：[../../HeartCraftLab/tests/Feature/Api/HeartInstallTest.php](../../HeartCraftLab/tests/Feature/Api/HeartInstallTest.php)
-- サーバ側 spec：[../../HeartCraftLab/docs/spec.md](../../HeartCraftLab/docs/spec.md) §6.5
-
----
-
 ## 補足：実装時の落とし穴
 
 事前に潰しておきたい小さな罠を列挙する。
@@ -280,28 +269,18 @@ const { machineId } = require('node-machine-id') as { machineId: (original?: boo
 実装後の自己確認手順：
 
 ```sh
-# 1. サーバ起動（HeartCraftLab 側）
-cd ../HeartCraftLab
-sail up -d
-sail artisan migrate:fresh --seed   # heart_installs を空にしてから確認したい場合
+# 1. サーバ起動（heart_installs を空にして確認したい場合は DB を初期化しておく）
 
 # 2. CLI ビルド
-cd ../heartcraft
 npm run build
 
 # 3. 別ディレクトリで install を実行
 cd $(mktemp -d)
-HEARTCRAFT_API_URL=http://localhost node /Users/furihata/Documents/GitHub/heartcraft/dist/cli.js install hatarson/zundamon
+HEARTCRAFT_API_URL=http://localhost node /path/to/heartcraft/dist/cli.js install hatarson/zundamon
 
 # 4. サーバ側で heart_installs に行が追加されたか確認
-cd ../HeartCraftLab
-sail artisan tinker --execute 'echo \App\Models\HeartInstall::count();'
-# → 1 が出れば成功
 
 # 5. fire-and-forget の検証：サーバを止めて install が成功するか
-sail stop
-cd $(mktemp -d)
-HEARTCRAFT_API_URL=http://localhost node /Users/furihata/Documents/GitHub/heartcraft/dist/cli.js install hatarson/zundamon
 # → fetch (download) も失敗するので install 全体は失敗するのが正しい
 # → 「サーバ download 成功 + telemetry のみ失敗」の検証は、
 #    HEARTCRAFT_API_URL を別ホストに分ける形で組むか、download 成功後に通信を意図的に切る手動テストでカバー

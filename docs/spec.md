@@ -2,7 +2,7 @@
 
 **バージョン**：v0.1.0（pre-alpha）
 **対応サーバ API**：v1
-**source of truth**：本ドキュメント（CLI 側の挙動）／API 契約の正は [../HeartCraftLab/docs/spec.md](../../HeartCraftLab/docs/spec.md) §5.3
+**source of truth**：本ドキュメント（CLI 側の挙動）
 
 ---
 
@@ -152,8 +152,6 @@ applyTo: '**'
 ---
 
 ## 5. API 契約（クライアント目線の要約）
-
-> 正は [../../HeartCraftLab/docs/spec.md](../../HeartCraftLab/docs/spec.md) §5.3
 
 - **URL**：`GET /api/hearts/{user}/{name}`
 - **レスポンス**：

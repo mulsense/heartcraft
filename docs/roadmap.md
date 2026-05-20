@@ -1,7 +1,6 @@
 # heartcraft 開発ロードマップ
 
-サーバ側の全体スプリント計画は [../../HeartCraftLab/docs/sprints.md](../../HeartCraftLab/docs/sprints.md)。
-本ドキュメントは CLI 側のみを抜き出して整理。
+本ドキュメントは CLI 側の開発計画を整理する。
 
 ---
 
@@ -19,8 +18,6 @@
 ---
 
 ## 次の作業（v0.2.0 想定）
-
-サーバ側 [sprints.md](../../HeartCraftLab/docs/sprints.md) の **Phase E** に対応する CLI 側タスク群：
 
 | タスク | 内容 | 参照 |
 |---|---|---|
@@ -51,21 +48,7 @@
 
 ## v1.0 リリース時に必要な周辺作業
 
-サーバ側 sprints.md の **Phase F** と同期：
-
 - npm パッケージ公開（`npm publish --tag alpha` → 様子見後 `latest` 昇格）
 - GitHub リリースタグ
 - README の正式版（インストール手順 / トラブルシュート）
 - サーバ API URL を本番（`https://heartcraftlab.com`）に切り替え
-
----
-
-## クロスリポ参照ルール
-
-API 契約の変更（URL・レスポンス形式・frontmatter）は両リポに**同期 PR**を立てる：
-
-- サーバ側 PR → API 変更
-- CLI 側 PR → 対応する fetch / parse 変更
-- 互いの PR 説明にリンクを張る
-
-API 契約以外の変更（CLI 独自挙動・出力フォーマット等）は本リポ単独で進めて OK。

@@ -12,20 +12,6 @@ npx heartcraft use hatarson/zundamon
 サーバから frontmatter 付き Markdown を取得し、`.claude/skills/heartcraft/<user>/<name>.md`
 に保存、`SKILL.md` のアクティブ Heart 参照を書き換えて即適用する。
 
-## 兄弟リポジトリ（HeartCraftLab）
-
-このCLIは [HeartCraftLab](../HeartCraftLab/) の API クライアントです。
-両リポは **`../` で sibling 配置**することを前提にしています。
-
-| 取得元 | 場所 |
-|---|---|
-| API 契約（URL / レスポンス形式 / frontmatter） | [../HeartCraftLab/docs/spec.md](../HeartCraftLab/docs/spec.md) §5.3（source of truth） |
-| DB スキーマ・人格データの実体 | [../HeartCraftLab/.claude/rules/database.md](../HeartCraftLab/.claude/rules/database.md) |
-| CLI 仕様（サブコマンド・ファイル配置・SKILL.md 形式） | [docs/spec.md](docs/spec.md)（本リポが source of truth） |
-| 起業フェーズ・KPI・マーケ計画 | ../HeartCraftLab 側のみ |
-
-クロスリポ変更（API 契約の追加 / 変更）は両リポに同期 PR を立てる。
-
 ## 技術スタック
 
 - **TypeScript**（strict、ESM）
@@ -47,7 +33,7 @@ npx heartcraft use hatarson/zundamon
 
 ## ローカルでサーバと組み合わせて動かす
 
-1. `../HeartCraftLab` 側で `sail up -d` + `sail artisan db:seed`
+1. サーバを起動（API は `GET /api/hearts/{user}/{name}` を返す）
 2. 本リポで `npm run build`
 3. 任意の作業ディレクトリで実行：
    ```sh
@@ -92,4 +78,3 @@ dist/                   # tsc 出力（gitignore）
 - [README.md](README.md) — エンドユーザー向け
 - [docs/spec.md](docs/spec.md) — CLI 仕様（サブコマンド / ファイル配置 / SKILL.md / API 接続）
 - [docs/roadmap.md](docs/roadmap.md) — 開発ロードマップ
-- [../HeartCraftLab/docs/spec.md](../HeartCraftLab/docs/spec.md) — サーバ側仕様（API 契約の source of truth）
