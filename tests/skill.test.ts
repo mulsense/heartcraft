@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { extractDescription, renderSkillMd } from '../src/lib/skill.js';
+import {
+  extractDescription,
+  renderCopilotInstructions,
+  renderCursorRule,
+  renderGeminiManifest,
+  renderGeminiMd,
+  renderSkillMd,
+} from '../src/lib/skill.js';
+
+const HEART_BODY = `---
+name: zundamon
+creator: tanaka
+description: '明るく元気なずんだもん人格'
+---
+
+# ずんだもん人格
+
+あなたはずんだもんなのだ。
+`;
 
 describe('renderSkillMd', () => {
   it('includes the active heart path when given', () => {
@@ -11,6 +29,62 @@ describe('renderSkillMd', () => {
   it('falls back to inactive message when null', () => {
     const out = renderSkillMd(null);
     expect(out).toContain('現在アクティブな Heart はありません');
+  });
+});
+
+describe('renderCursorRule', () => {
+  it('emits MDC frontmatter with alwaysApply: true and inlines heart body', () => {
+    const out = renderCursorRule({ user: 'tanaka', name: 'zundamon' }, HEART_BODY);
+    expect(out).toContain('alwaysApply: true');
+    expect(out).toContain('# HeartCraftLab Heart Loader (tanaka/zundamon)');
+    expect(out).toContain('あなたはずんだもんなのだ。');
+    // インライン時に frontmatter は剥がす
+    expect(out).not.toContain('creator: tanaka');
+  });
+
+  it('falls back to inactive message when null', () => {
+    const out = renderCursorRule(null, null);
+    expect(out).toContain('alwaysApply: true');
+    expect(out).toContain('現在アクティブな Heart はありません');
+  });
+});
+
+describe('renderCopilotInstructions', () => {
+  it("emits instructions frontmatter with applyTo: '**' and inlines heart body", () => {
+    const out = renderCopilotInstructions({ user: 'tanaka', name: 'zundamon' }, HEART_BODY);
+    expect(out).toContain("applyTo: '**'");
+    expect(out).toContain('# HeartCraftLab Heart Loader (tanaka/zundamon)');
+    expect(out).toContain('あなたはずんだもんなのだ。');
+  });
+
+  it('falls back to inactive message when null', () => {
+    const out = renderCopilotInstructions(null, null);
+    expect(out).toContain("applyTo: '**'");
+    expect(out).toContain('現在アクティブな Heart はありません');
+  });
+});
+
+describe('renderGeminiMd', () => {
+  it('inlines heart body with active heading', () => {
+    const out = renderGeminiMd({ user: 'tanaka', name: 'zundamon' }, HEART_BODY);
+    expect(out).toContain('# HeartCraftLab Heart Loader (tanaka/zundamon)');
+    expect(out).toContain('あなたはずんだもんなのだ。');
+    expect(out).not.toContain('name: zundamon\n');
+  });
+
+  it('falls back to inactive message when null', () => {
+    const out = renderGeminiMd(null, null);
+    expect(out).toContain('現在アクティブな Heart はありません');
+  });
+});
+
+describe('renderGeminiManifest', () => {
+  it('emits valid JSON with name/version/contextFileName', () => {
+    const out = renderGeminiManifest('0.1.0');
+    const parsed = JSON.parse(out) as Record<string, unknown>;
+    expect(parsed.name).toBe('heartcraft');
+    expect(parsed.version).toBe('0.1.0');
+    expect(parsed.contextFileName).toBe('GEMINI.md');
   });
 });
 

@@ -15,12 +15,16 @@ describe('runClear', () => {
     await rm(tmp, { recursive: true, force: true });
   });
 
-  it('writes a SKILL.md with the inactive message', async () => {
+  it('writes a SKILL.md with the inactive message when no agent detected (Claude Code fallback)', async () => {
     const result = await runClear({ baseDir: tmp });
 
-    expect(result.skillMdPath).toBe(join(tmp, '.claude/skills/heartcraft/SKILL.md'));
+    expect(result.agents).toHaveLength(1);
+    expect(result.agents[0].agent).toBe('claude-code');
+    expect(result.agents[0].activationPaths[0]).toBe(
+      join(tmp, '.claude/skills/heartcraft/SKILL.md'),
+    );
 
-    const skill = await readFile(result.skillMdPath, 'utf8');
+    const skill = await readFile(result.agents[0].activationPaths[0], 'utf8');
     expect(skill).toContain('現在アクティブな Heart はありません');
     expect(skill).not.toMatch(/\*\*[a-z0-9_-]+\/[a-z0-9_-]+\.md\*\*/);
   });
@@ -41,5 +45,21 @@ describe('runClear', () => {
     // 配置済み Heart 本体は残す
     const heart = await readFile(heartPath, 'utf8');
     expect(heart).toBe('heart body');
+  });
+
+  it('clears activation across multiple detected agents', async () => {
+    await mkdir(join(tmp, '.claude'), { recursive: true });
+    await mkdir(join(tmp, '.cursor'), { recursive: true });
+
+    const result = await runClear({ baseDir: tmp });
+
+    expect(result.agents.map((a) => a.agent)).toEqual(['claude-code', 'cursor']);
+
+    const skill = await readFile(join(tmp, '.claude/skills/heartcraft/SKILL.md'), 'utf8');
+    expect(skill).toContain('現在アクティブな Heart はありません');
+
+    const mdc = await readFile(join(tmp, '.cursor/rules/heartcraft.mdc'), 'utf8');
+    expect(mdc).toContain('現在アクティブな Heart はありません');
+    expect(mdc).toContain('alwaysApply: true');
   });
 });

@@ -1,12 +1,12 @@
-import { mkdir, stat, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+import { detectAgents, findCachedHeart, type AgentAdapter } from '../lib/agents.js';
 import { parseSlug } from '../lib/slug.js';
-import { extractDescription, renderSkillMd } from '../lib/skill.js';
+import { extractDescription } from '../lib/skill.js';
 import { recordInstall } from '../lib/telemetry.js';
 import { readCliVersion } from '../lib/version.js';
 
 const DEFAULT_API_URL = 'http://localhost';
-const SKILLS_SUBPATH = '.claude/skills/heartcraft';
 
 export interface UseOptions {
   slug: string;
@@ -14,44 +14,32 @@ export interface UseOptions {
   baseDir?: string;
   /** サーバ API のベース URL。デフォルトは env HEARTCRAFT_API_URL or http://localhost */
   apiUrl?: string;
+  /** テスト DI: 検知済 agent を直接渡す。指定したら detectAgents をスキップする。 */
+  agents?: readonly AgentAdapter[];
+}
+
+export interface UseAgentResult {
+  agent: string;
+  displayName: string;
+  heartPath: string;
+  activationPaths: string[];
 }
 
 export interface UseResult {
-  heartPath: string;
-  skillMdPath: string;
-  /** ローカルに Heart ファイルが無くて DL が走ったかどうか。 */
+  /** 適用された agent 群 */
+  agents: UseAgentResult[];
+  /** サーバから DL が走ったかどうか。 */
   downloaded: boolean;
   /** DL したときは frontmatter から取り出した description。DL スキップ時は null。 */
   description: string | null;
 }
 
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch {
-    return false;
-  }
+async function writeFileEnsureDir(path: string, content: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, content, 'utf8');
 }
 
-/** use サブコマンドの本体。副作用は file system + fetch のみ。 */
-export async function runUse(opts: UseOptions): Promise<UseResult> {
-  const { user, name } = parseSlug(opts.slug);
-  const baseDir = opts.baseDir ?? process.cwd();
-  const apiUrl = (opts.apiUrl ?? process.env.HEARTCRAFT_API_URL ?? DEFAULT_API_URL).replace(/\/$/, '');
-
-  const skillsDir = resolve(baseDir, SKILLS_SUBPATH);
-  const heartPath = join(skillsDir, user, `${name}.md`);
-  const skillMdPath = join(skillsDir, 'SKILL.md');
-
-  // ローカルに既に Heart ファイルがある場合は DL せず SKILL.md だけ書き換える。
-  // telemetry も送らない（DL があった時のみ送信）。
-  if (await fileExists(heartPath)) {
-    await mkdir(skillsDir, { recursive: true });
-    await writeFile(skillMdPath, renderSkillMd({ user, name }), 'utf8');
-    return { heartPath, skillMdPath, downloaded: false, description: null };
-  }
-
+async function fetchHeart(apiUrl: string, user: string, name: string): Promise<string> {
   const url = `${apiUrl}/api/hearts/${encodeURIComponent(user)}/${encodeURIComponent(name)}`;
 
   let res: Response;
@@ -69,39 +57,82 @@ export async function runUse(opts: UseOptions): Promise<UseResult> {
     throw new Error(`API error (${res.status}): ${await res.text()}`);
   }
 
-  const body = await res.text();
-  const description = extractDescription(body);
+  return res.text();
+}
 
-  await mkdir(dirname(heartPath), { recursive: true });
-  await writeFile(heartPath, body, 'utf8');
-  await writeFile(skillMdPath, renderSkillMd({ user, name }), 'utf8');
+/** use サブコマンドの本体。副作用は file system + fetch のみ。 */
+export async function runUse(opts: UseOptions): Promise<UseResult> {
+  const slug = parseSlug(opts.slug);
+  const baseDir = opts.baseDir ?? process.cwd();
+  const apiUrl = (opts.apiUrl ?? process.env.HEARTCRAFT_API_URL ?? DEFAULT_API_URL).replace(/\/$/, '');
 
-  // telemetry: fire-and-forget。recordInstall は内部で例外を握りつぶす設計だが、
-  // readCliVersion などここでの例外も use 自体の成否に影響させない。
-  try {
-    const cliVersion = await readCliVersion();
-    await recordInstall({
-      slug: `${user}/${name}`,
-      apiUrl,
-      cliVersion,
-    });
-  } catch {
-    // noop
+  const agents = opts.agents ?? (await detectAgents(baseDir));
+
+  // どの agent でも未取得の場合のみ DL する。1 つでもキャッシュがあれば再利用。
+  const cachedPath = await findCachedHeart(baseDir, slug, agents);
+  let heartBody: string;
+  let downloaded = false;
+  let description: string | null = null;
+
+  if (cachedPath !== null) {
+    heartBody = await readFile(cachedPath, 'utf8');
+  } else {
+    heartBody = await fetchHeart(apiUrl, slug.user, slug.name);
+    downloaded = true;
+    description = extractDescription(heartBody);
   }
 
-  return { heartPath, skillMdPath, downloaded: true, description };
+  // 各 agent に Heart ファイル本体 + activation ファイル群を書き出す
+  const results: UseAgentResult[] = [];
+  for (const agent of agents) {
+    const heartPath = agent.heartPath(baseDir, slug);
+    await writeFileEnsureDir(heartPath, heartBody);
+
+    const activation = agent.renderActivation(baseDir, slug, heartBody);
+    for (const file of activation) {
+      await writeFileEnsureDir(file.path, file.content);
+    }
+
+    results.push({
+      agent: agent.name,
+      displayName: agent.displayName,
+      heartPath,
+      activationPaths: activation.map((f) => f.path),
+    });
+  }
+
+  // telemetry: DL が走った時のみ fire-and-forget で送信
+  if (downloaded) {
+    try {
+      const cliVersion = await readCliVersion();
+      await recordInstall({
+        slug: `${slug.user}/${slug.name}`,
+        apiUrl,
+        cliVersion,
+      });
+    } catch {
+      // noop
+    }
+  }
+
+  return { agents: results, downloaded, description };
 }
 
 /** commander action 用の薄いラッパー */
 export async function useCommand(slug: string): Promise<void> {
   const result = await runUse({ slug });
-  if (result.downloaded) {
-    const descLabel = result.description !== null && result.description !== '' ? `（${result.description}）` : '';
-    console.log(`✓ ${slug} をインストールしました${descLabel}`);
-    console.log(`  - ${result.heartPath}`);
-    console.log(`  - ${result.skillMdPath}（アクティブ Heart を更新）`);
-    return;
+
+  const verb = result.downloaded ? 'インストールしました' : '切り替えました';
+  const descLabel = result.downloaded && result.description !== null && result.description !== ''
+    ? `（${result.description}）`
+    : '';
+  console.log(`✓ ${slug} を ${result.agents.map((a) => a.displayName).join(' / ')} に${verb}${descLabel}`);
+
+  for (const a of result.agents) {
+    console.log(`  [${a.displayName}]`);
+    console.log(`    - ${a.heartPath}`);
+    for (const ap of a.activationPaths) {
+      console.log(`    - ${ap}（アクティブ Heart を更新）`);
+    }
   }
-  console.log(`✓ ${slug} に切り替えました`);
-  console.log(`  - ${result.skillMdPath}（アクティブ Heart を更新）`);
 }

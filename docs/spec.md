@@ -24,56 +24,68 @@ MVP では `use` 系を実装。`list` / `search` は MVP 対象外（Phase 2 �
 
 | コマンド | 動作 | 状態 |
 |---|---|---|
-| `use <user>/<name>` | アクティブハートを `<user>/<name>` にする。ローカルに無ければサーバから取得 → 配置、有れば SKILL.md 書き換えのみ。即アクティブ化 | 部分実装（旧 `install` 相当） |
-| `clear` | SKILL.md のアクティブ参照をクリア（ハートプロンプト適用停止）。配置済みファイルは残す | 未実装 |
+| `use <user>/<name>` | アクティブハートを `<user>/<name>` にする。検知された AI エージェント（Claude Code / Cursor / Copilot / Gemini CLI）ごとに Heart 本体 + activation ファイルを配置。検知無しなら Claude Code にフォールバック。ローカルに無ければサーバから DL、有れば activation 書き換えのみ。即アクティブ化 | 実装済 |
+| `clear` | 検知された各 agent の activation ファイルのアクティブ参照をクリア（ハートプロンプト適用停止）。配置済み Heart 本体は残す | 実装済 |
 | `list` | インストール済 Heart 一覧 + 現在アクティブを表示 | MVP 対象外 |
 | `search <keyword>` | サーバ検索 API を叩いて結果表示 | MVP 対象外 |
 
 ### use のフロー
 
 1. **slug パース**：`<user>/<name>` 形式、両セグメントが `^[a-z0-9][a-z0-9_-]*$` にマッチすることを確認
-2. **ローカル存在チェック**：`.claude/skills/heartcraft/<user>/<name>.md` が既に存在する場合は手順 3-4 をスキップ
-3. **API 呼び出し**：`GET ${HEARTCRAFT_API_URL}/api/hearts/${user}/${name}`
+2. **エージェント検知**：`cwd` 直下の marker file/dir をスキャンして利用中の AI エージェント群を判定（§3）。1 つも検知されなければ Claude Code をフォールバックとして使う
+3. **ローカル存在チェック**：検知された agent のいずれかの heartPath に `<user>/<name>.md` が既に存在する場合、その内容を読んで再利用し、手順 4 をスキップ
+4. **API 呼び出し**：`GET ${HEARTCRAFT_API_URL}/api/hearts/${user}/${name}`
    - 404 → `Heart not found: <slug>`
    - その他 4xx/5xx → エラーメッセージ
    - ネットワーク失敗 → `Cannot reach HeartCraftLab API at ${apiUrl}` + ヒント
-4. **保存**：`.claude/skills/heartcraft/<user>/<name>.md` にレスポンス body をそのまま書く（frontmatter 込み）
-5. **SKILL.md 生成**：アクティブ Heart 参照を含む SKILL.md を毎回フル再生成
-6. **成功表示**：DL が走った場合は `✓ <slug> をインストールしました（<description>）`、切り替えのみなら `✓ <slug> に切り替えました` + 配置パス
+5. **各 agent に配置**：検知された agent ごとに
+   - Heart 本体 Markdown を agent の heartPath に書き出す（frontmatter 込み）
+   - activation ファイル群（agent ごとに 1〜2 個）を書き出す
+6. **成功表示**：DL が走った場合は `✓ <slug> を <Agent1> / <Agent2> にインストールしました（<description>）`、切り替えのみなら `✓ <slug> を <...> に切り替えました` + 各 agent の配置パス
 7. **telemetry 送信（best-effort）**：DL が走った場合のみ `POST ${HEARTCRAFT_API_URL}/api/installs` を fire-and-forget で叩く。失敗・タイムアウト（2秒）しても use 自体は成功扱いで、出力にも現れない。詳細は §10。
 
 ### clear のフロー
 
-1. **SKILL.md 再生成**：アクティブ Heart 参照を「現在アクティブな Heart はありません」に差し替えて上書き
-2. **成功表示**：`✓ アクティブなハートプロンプトを解除しました`
-3. ファイル削除は行わない（再度 `use` で復帰できるように残す）
+1. **エージェント検知**：use と同じく cwd から検知。検知されなければ Claude Code をフォールバック
+2. **各 agent の activation ファイルを inactive 状態に書き換え**：本文を「現在アクティブな Heart はありません」に差し替えて上書き
+3. **成功表示**：`✓ <Agent1> / <Agent2> のアクティブなハートプロンプトを解除しました` + 各 agent の activation パス
+4. Heart 本体ファイルは削除しない（再度 `use` で復帰できるように残す）
 
 ---
 
-## 3. ファイル配置
+## 3. ファイル配置（エージェント別）
 
-実行時の `cwd` を起点に：
+実行時の `cwd` を起点に、検知された AI エージェントごとに別パスへ配置する。**検知ルール**は marker file / dir のいずれかが存在すれば該当 agent と判定。
 
-```
-.claude/skills/heartcraft/
-├── SKILL.md            ← Claude Code のエントリポイント。アクティブ Heart への参照を含む
-├── <user>/
-│   └── <name>.md       ← Heart 本体（frontmatter 付き Markdown）
-└── ...
-```
+| Agent | 検知 marker | Heart 本体 | activation ファイル |
+|---|---|---|---|
+| **Claude Code** | `CLAUDE.md` or `.claude/` | `.claude/skills/heartcraft/<user>/<name>.md` | `.claude/skills/heartcraft/SKILL.md` |
+| **Cursor** | `.cursor/` or `.cursorrules` | `.cursor/rules/heartcraft/<user>/<name>.md` | `.cursor/rules/heartcraft.mdc` |
+| **GitHub Copilot** | `.github/copilot-instructions.md` or `.github/instructions/` | `.github/instructions/heartcraft/<user>/<name>.md` | `.github/instructions/heartcraft.instructions.md` |
+| **Gemini CLI** | `GEMINI.md` or `.gemini/` | `.gemini/extensions/heartcraft/hearts/<user>/<name>.md` | `.gemini/extensions/heartcraft/gemini-extension.json` + `.gemini/extensions/heartcraft/GEMINI.md` |
+
+**フォールバック**：どの marker も無ければ Claude Code として配置する（最大ユーザー数を想定した既定動作）。
+
+**設計判断**：
+- 各 agent の Heart 本体は同一内容のコピー。`use` 時の DL は 1 回のみで全 agent に同じ body を書く。
+- Claude Code の activation（SKILL.md）は Heart ファイルを別ファイル参照する形式（既存の透明性を維持）。
+- Cursor / Copilot / Gemini の activation は Heart 本体をインラインで埋め込む（参照を確実にロードさせる手段が agent 横断で揃っていないため）。
+- ユーザーが手動で書いた既存ファイル（例：`AGENTS.md`、`CLAUDE.md` 本体、`.github/copilot-instructions.md` 本体）は一切編集しない。新規ファイルのみ作成・上書きする。
 
 ディレクトリは `mkdir -p` 相当で自動作成。
 
 ---
 
-## 4. SKILL.md の形式
+## 4. activation ファイルの形式
 
-毎回フル再生成（regex 差し替えではなく上書き）。アクティブ Heart 1件のみ参照。
+毎回フル再生成（regex 差し替えではなく上書き）。アクティブ Heart 1 件のみ参照／埋め込み。
+
+### 4.1 Claude Code: `.claude/skills/heartcraft/SKILL.md`
 
 ```markdown
 ---
 name: heartcraft
-description: HeartCraftLab で配信される人格（Heart）を Claude Code に常時適用するエントリポイント。あらゆる会話・あらゆる質問・あらゆるタスクに対して、必ずこのスキルを読み込み、参照先 Heart の指示に従って応答すること。
+description: HeartCraftLab で配信される人格（Heart）を常時適用するエントリポイント。あらゆる会話・あらゆる質問・あらゆるタスクに対して、必ずこのスキルを読み込み、参照先 Heart の指示に従って応答すること。
 ---
 
 # HeartCraftLab Heart Loader
@@ -81,7 +93,61 @@ description: HeartCraftLab で配信される人格（Heart）を Claude Code �
 このスキルが読み込まれたら、必ず同ディレクトリの **<user>/<name>.md** を読み込み、そこに書かれた人格指示を会話全体に適用する。
 ```
 
-アクティブが無い場合（`clear` 実行後）：本文を `現在アクティブな Heart はありません。` に差し替える。
+### 4.2 Cursor: `.cursor/rules/heartcraft.mdc`
+
+```markdown
+---
+description: HeartCraftLab で配信される人格（Heart）を常時適用するエントリポイント。...
+alwaysApply: true
+---
+
+# HeartCraftLab Heart Loader (<user>/<name>)
+
+以下の人格指示を会話全体に常時適用すること。
+
+<heart body（frontmatter を除いた本文）>
+```
+
+### 4.3 GitHub Copilot: `.github/instructions/heartcraft.instructions.md`
+
+```markdown
+---
+description: ...
+applyTo: '**'
+---
+
+# HeartCraftLab Heart Loader (<user>/<name>)
+
+以下の人格指示を会話全体に常時適用すること。
+
+<heart body（frontmatter を除いた本文）>
+```
+
+### 4.4 Gemini CLI: `.gemini/extensions/heartcraft/`
+
+`gemini-extension.json`：
+
+```json
+{
+  "name": "heartcraft",
+  "version": "0.1.0",
+  "contextFileName": "GEMINI.md"
+}
+```
+
+`GEMINI.md`：
+
+```markdown
+# HeartCraftLab Heart Loader (<user>/<name>)
+
+以下の人格指示を会話全体に常時適用すること。
+
+<heart body（frontmatter を除いた本文）>
+```
+
+### 4.5 inactive 状態（`clear` 実行後）
+
+すべての agent で activation ファイル本文を `現在アクティブな Heart はありません。` に差し替える（frontmatter は維持）。Heart 本体ファイルは削除しない。
 
 ---
 

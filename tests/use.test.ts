@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runUse } from '../src/commands/use.js';
+import { claudeCodeAdapter, cursorAdapter } from '../src/lib/agents.js';
 
 const HEART_BODY = `---
 name: zundamon
@@ -28,7 +29,7 @@ describe('runUse', () => {
     vi.restoreAllMocks();
   });
 
-  it('downloads and writes the heart file + SKILL.md when local file is missing', async () => {
+  it('downloads and writes the heart file + SKILL.md when local file is missing (Claude Code fallback)', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(HEART_BODY, { status: 200, headers: { 'Content-Type': 'text/markdown' } }),
     );
@@ -41,6 +42,8 @@ describe('runUse', () => {
 
     expect(result.downloaded).toBe(true);
     expect(result.description).toBe('明るく元気なずんだもん人格');
+    expect(result.agents).toHaveLength(1);
+    expect(result.agents[0].agent).toBe('claude-code');
 
     const heart = await readFile(join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md'), 'utf8');
     expect(heart).toBe(HEART_BODY);
@@ -50,10 +53,9 @@ describe('runUse', () => {
   });
 
   it('skips download when the heart file already exists locally', async () => {
-    const existing = '---\nname: zundamon\n---\n\n# already here\n';
     const heartPath = join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md');
     await mkdir(dirname(heartPath), { recursive: true });
-    await writeFile(heartPath, existing, 'utf8');
+    await writeFile(heartPath, HEART_BODY, 'utf8');
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
@@ -67,11 +69,9 @@ describe('runUse', () => {
     expect(result.description).toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
 
-    // 既存の Heart 本体は触らない
     const heart = await readFile(heartPath, 'utf8');
-    expect(heart).toBe(existing);
+    expect(heart).toBe(HEART_BODY);
 
-    // SKILL.md は新規生成されて参照が書き換わっている
     const skill = await readFile(join(tmp, '.claude/skills/heartcraft/SKILL.md'), 'utf8');
     expect(skill).toContain('**tanaka/zundamon.md**');
   });
@@ -166,5 +166,90 @@ describe('runUse', () => {
     expect(result.description).toBe('明るく元気なずんだもん人格');
     const heart = await readFile(join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md'), 'utf8');
     expect(heart).toBe(HEART_BODY);
+  });
+
+  it('writes to multiple agents when both Claude Code and Cursor are detected', async () => {
+    await mkdir(join(tmp, '.claude'), { recursive: true });
+    await mkdir(join(tmp, '.cursor'), { recursive: true });
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/hearts/')) {
+        return new Response(HEART_BODY, { status: 200 });
+      }
+      return new Response('', { status: 201 });
+    });
+
+    const result = await runUse({
+      slug: 'tanaka/zundamon',
+      baseDir: tmp,
+      apiUrl: 'http://stub',
+    });
+
+    expect(result.agents.map((a) => a.agent)).toEqual(['claude-code', 'cursor']);
+
+    // Claude Code: Heart + SKILL.md
+    expect(
+      await readFile(join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md'), 'utf8'),
+    ).toBe(HEART_BODY);
+    expect(
+      await readFile(join(tmp, '.claude/skills/heartcraft/SKILL.md'), 'utf8'),
+    ).toContain('**tanaka/zundamon.md**');
+
+    // Cursor: Heart + MDC
+    expect(
+      await readFile(join(tmp, '.cursor/rules/heartcraft/tanaka/zundamon.md'), 'utf8'),
+    ).toBe(HEART_BODY);
+    const mdc = await readFile(join(tmp, '.cursor/rules/heartcraft.mdc'), 'utf8');
+    expect(mdc).toContain('alwaysApply: true');
+    expect(mdc).toContain('あなたはずんだもんなのだ。');
+  });
+
+  it('downloads once and reuses content across agents (DI: claude + cursor)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/hearts/')) {
+        return new Response(HEART_BODY, { status: 200 });
+      }
+      return new Response('', { status: 201 });
+    });
+
+    await runUse({
+      slug: 'tanaka/zundamon',
+      baseDir: tmp,
+      apiUrl: 'http://stub',
+      agents: [claudeCodeAdapter, cursorAdapter],
+    });
+
+    // hearts API は 1 回しか呼ばれない（cursor 用に再 DL しない）
+    const heartCalls = fetchSpy.mock.calls.filter((c) => {
+      const u = typeof c[0] === 'string' ? c[0] : String(c[0]);
+      return u.includes('/api/hearts/');
+    });
+    expect(heartCalls).toHaveLength(1);
+  });
+
+  it('uses cached content when one agent has the heart and others do not', async () => {
+    // Cursor 側に既にあるが Claude Code 側には無いケース。Cursor の content を再利用して両方に書く。
+    const cursorHeart = join(tmp, '.cursor/rules/heartcraft/tanaka/zundamon.md');
+    await mkdir(dirname(cursorHeart), { recursive: true });
+    await writeFile(cursorHeart, HEART_BODY, 'utf8');
+    await mkdir(join(tmp, '.claude'), { recursive: true });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const result = await runUse({
+      slug: 'tanaka/zundamon',
+      baseDir: tmp,
+      apiUrl: 'http://stub',
+    });
+
+    expect(result.downloaded).toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    // Claude Code 側に Heart ファイルが新規作成される
+    expect(
+      await readFile(join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md'), 'utf8'),
+    ).toBe(HEART_BODY);
   });
 });
