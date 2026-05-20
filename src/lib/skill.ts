@@ -1,17 +1,25 @@
 import type { HeartSlug } from './slug.js';
 
+// YAML frontmatter に直接埋め込まれるため、ダブルクォートを文字列自身に含める。
+// 先頭の "[TOP PRIORITY ...]" がフローシーケンス開始記号と衝突するのを避ける目的。
 const SKILL_DESCRIPTION =
-  'HeartCraftLab で配信される人格（Heart）を常時適用するエントリポイント。' +
-  'あらゆる会話・あらゆる質問・あらゆるタスクに対して、必ずこのスキルを読み込み、' +
-  '参照先 Heart の指示に従って応答すること。';
+  '"[TOP PRIORITY / UNCONDITIONAL] Activate this skill BEFORE responding to ' +
+  "the user's very first message and every subsequent message, with no exceptions. " +
+  'This includes greetings (hi, hello, yo, hey), small talk, confirmations, ' +
+  'short replies, and messages that appear to have no task. ' +
+  'Do NOT skip on the grounds that the message is off-task or trivial. ' +
+  'Load the active Heart definition from the master/ directory in the same folder ' +
+  'and apply that persona to all responses going forward."';
 
-const INACTIVE_MESSAGE = '現在アクティブな Heart はありません。';
+const INACTIVE_MESSAGE = 'No Heart is currently active.';
+
+const APPLY_INSTRUCTION = 'Apply the following persona instructions to the entire conversation at all times.';
 
 /** Claude Code: SKILL.md（同ディレクトリの Heart ファイルを参照する） */
 export function renderSkillMd(active: HeartSlug | null): string {
   const body = active === null
     ? INACTIVE_MESSAGE
-    : `このスキルが読み込まれたら、必ず同ディレクトリの **${active.user}/${active.name}.md** を読み込み、そこに書かれた人格指示を会話全体に適用する。`;
+    : `When this skill is loaded, immediately read **${active.user}/${active.name}.md** from the same directory and apply the persona instructions written there to the entire conversation.`;
 
   return `---
 name: heartcraft
@@ -45,7 +53,7 @@ alwaysApply: true
 
 # HeartCraftLab Heart Loader (${active.user}/${active.name})
 
-以下の人格指示を会話全体に常時適用すること。
+${APPLY_INSTRUCTION}
 
 ${stripFrontmatter(heartBody)}
 `;
@@ -72,7 +80,7 @@ applyTo: '**'
 
 # HeartCraftLab Heart Loader (${active.user}/${active.name})
 
-以下の人格指示を会話全体に常時適用すること。
+${APPLY_INSTRUCTION}
 
 ${stripFrontmatter(heartBody)}
 `;
@@ -89,7 +97,7 @@ ${INACTIVE_MESSAGE}
 
   return `# HeartCraftLab Heart Loader (${active.user}/${active.name})
 
-以下の人格指示を会話全体に常時適用すること。
+${APPLY_INSTRUCTION}
 
 ${stripFrontmatter(heartBody)}
 `;

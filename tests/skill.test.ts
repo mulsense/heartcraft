@@ -28,7 +28,7 @@ describe('renderSkillMd', () => {
 
   it('falls back to inactive message when null', () => {
     const out = renderSkillMd(null);
-    expect(out).toContain('現在アクティブな Heart はありません');
+    expect(out).toContain('No Heart is currently active.');
   });
 });
 
@@ -45,7 +45,7 @@ describe('renderCursorRule', () => {
   it('falls back to inactive message when null', () => {
     const out = renderCursorRule(null, null);
     expect(out).toContain('alwaysApply: true');
-    expect(out).toContain('現在アクティブな Heart はありません');
+    expect(out).toContain('No Heart is currently active.');
   });
 });
 
@@ -60,7 +60,7 @@ describe('renderCopilotInstructions', () => {
   it('falls back to inactive message when null', () => {
     const out = renderCopilotInstructions(null, null);
     expect(out).toContain("applyTo: '**'");
-    expect(out).toContain('現在アクティブな Heart はありません');
+    expect(out).toContain('No Heart is currently active.');
   });
 });
 
@@ -74,7 +74,7 @@ describe('renderGeminiMd', () => {
 
   it('falls back to inactive message when null', () => {
     const out = renderGeminiMd(null, null);
-    expect(out).toContain('現在アクティブな Heart はありません');
+    expect(out).toContain('No Heart is currently active.');
   });
 });
 

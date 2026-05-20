@@ -25,7 +25,7 @@ describe('runClear', () => {
     );
 
     const skill = await readFile(result.agents[0].activationPaths[0], 'utf8');
-    expect(skill).toContain('現在アクティブな Heart はありません');
+    expect(skill).toContain('No Heart is currently active.');
     expect(skill).not.toMatch(/\*\*[a-z0-9_-]+\/[a-z0-9_-]+\.md\*\*/);
   });
 
@@ -39,7 +39,7 @@ describe('runClear', () => {
     await runClear({ baseDir: tmp });
 
     const skill = await readFile(skillMdPath, 'utf8');
-    expect(skill).toContain('現在アクティブな Heart はありません');
+    expect(skill).toContain('No Heart is currently active.');
     expect(skill).not.toContain('previous skill');
 
     // 配置済み Heart 本体は残す
@@ -56,10 +56,10 @@ describe('runClear', () => {
     expect(result.agents.map((a) => a.agent)).toEqual(['claude-code', 'cursor']);
 
     const skill = await readFile(join(tmp, '.claude/skills/heartcraft/SKILL.md'), 'utf8');
-    expect(skill).toContain('現在アクティブな Heart はありません');
+    expect(skill).toContain('No Heart is currently active.');
 
     const mdc = await readFile(join(tmp, '.cursor/rules/heartcraft.mdc'), 'utf8');
-    expect(mdc).toContain('現在アクティブな Heart はありません');
+    expect(mdc).toContain('No Heart is currently active.');
     expect(mdc).toContain('alwaysApply: true');
   });
 });
