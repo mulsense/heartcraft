@@ -6,7 +6,7 @@
 Claude Code に1コマンドで導入する CLI。
 
 ```sh
-npx heartcraft install hatarson/zundamon
+npx heartcraft use hatarson/zundamon
 ```
 
 サーバから frontmatter 付き Markdown を取得し、`.claude/skills/heartcraft/<user>/<name>.md`
@@ -52,7 +52,7 @@ npx heartcraft install hatarson/zundamon
 3. 任意の作業ディレクトリで実行：
    ```sh
    cd $(mktemp -d)
-   node /Users/furihata/Documents/GitHub/heartcraft/dist/cli.js install hatarson/zundamon
+   node /Users/furihata/Documents/GitHub/heartcraft/dist/cli.js use hatarson/zundamon
    claude   # 新規 Claude Code セッション → 人格適用確認
    ```
 
@@ -64,7 +64,8 @@ npx heartcraft install hatarson/zundamon
 src/
 ├── cli.ts              # commander エントリポイント（shebang 付き）
 ├── commands/           # サブコマンド実装（1ファイル1コマンド）
-│   └── install.ts
+│   ├── use.ts          # インストール + 切り替えを兼ねる
+│   └── clear.ts        # アクティブ参照の解除
 └── lib/                # 共通ロジック（pure 関数中心）
     ├── slug.ts         # <user>/<name> の parse
     └── skill.ts        # SKILL.md レンダリング / frontmatter 抽出
@@ -75,7 +76,7 @@ dist/                   # tsc 出力（gitignore）
 ## コーディングルール
 
 - **TypeScript strict**、`any` は原則禁止
-- **副作用は引数で受ける**：`runInstall({ slug, baseDir, apiUrl })` のように fs / fetch / env への依存をパラメータ化 → テストで mock しやすい
+- **副作用は引数で受ける**：`runUse({ slug, baseDir, apiUrl })` のように fs / fetch / env への依存をパラメータ化 → テストで mock しやすい
 - 薄い commander action はその pure 関数を呼ぶだけにする
 - **コメントは日本語 OK**
 - **コミットはユーザーの指示があってから**。勝手にしない
@@ -83,7 +84,7 @@ dist/                   # tsc 出力（gitignore）
 ## テスト方針
 
 - **slug / SKILL.md レンダリングなどの pure 関数**：直接ユニットテスト
-- **install / switch などの I/O フロー**：`vi.spyOn(globalThis, 'fetch')` でモック + `mkdtemp` で一時ディレクトリ
+- **use / clear などの I/O フロー**：`vi.spyOn(globalThis, 'fetch')` でモック + `mkdtemp` で一時ディレクトリ。`use` は「DL あり」「DL スキップ」両分岐を検証
 - **CLI 起動のスモーク**：`execFileSync('npx', ['tsx', ...])` で `--version` `--help` 程度（ネットワークに依存させない）
 
 ## 重要なドキュメント

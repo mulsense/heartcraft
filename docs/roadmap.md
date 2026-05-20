@@ -7,7 +7,7 @@
 
 ## 現在のバージョン
 
-**v0.1.0（pre-alpha）** — `install` サブコマンド + install telemetry 送信。
+**v0.1.0（pre-alpha）** — `install` サブコマンド（v0.2 で `use` にリネーム予定） + install telemetry 送信。
 
 検証済の事実：
 - ✅ API → frontmatter Markdown 取得
@@ -24,11 +24,17 @@
 
 | タスク | 内容 | 参照 |
 |---|---|---|
-| `switch` 実装 | SKILL.md 参照行の書き換えのみ（DL なし） | spec.md §2 |
-| `list` 実装 | `.claude/skills/heartcraft/` のディレクトリスキャン + アクティブ表示 | spec.md §2 |
-| `uninstall` 実装 | ファイル削除 + 参照クリア | spec.md §2 |
-| `search` 実装 | サーバ `GET /api/hearts/search?q=...` を叩く（要サーバ側実装） | サーバ spec §5.3 |
+| `install` → `use` リネーム | コマンド名・関数名・テスト名を更新。旧 `install` は撤去（pre-alpha なので後方互換維持しない） | spec.md §2 |
+| `use` の DL スキップ分岐 | `.claude/skills/heartcraft/<user>/<name>.md` 存在チェック → 既にあれば DL を skip し SKILL.md 書き換えのみ | spec.md §2 |
+| `clear` 実装 | SKILL.md の本文を「現在アクティブな Heart はありません。」に差し替え | spec.md §2 |
 | API バージョンチェック | レスポンスヘッダ `X-Heartcraft-Api-Version` を確認し、サポート外なら警告 | spec.md §5 |
+
+### MVP 対象外（Phase 2 以降）
+
+| タスク | 内容 |
+|---|---|
+| `list` | `.claude/skills/heartcraft/` のディレクトリスキャン + アクティブ表示 |
+| `search` | サーバ `GET /api/hearts/search?q=...` を叩く（要サーバ側実装） |
 
 ---
 

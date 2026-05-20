@@ -1,30 +1,33 @@
-# heartcraft 機能一覧（v0.1.0 時点）
+# heartcraft 機能一覧
 
-**最終更新**：2026-05-20
+**最終更新**：2026-05-20（CLI コマンド体系を `install`/`switch` から `use`/`clear` にリネーム）
 **バージョン**：v0.1.0（pre-alpha）
 
-実装済・実機検証済の機能スナップショット。詳細仕様は [spec.md](spec.md)、今後の計画は [roadmap.md](roadmap.md)。
+仕様スナップショット（リネーム後の設計）。詳細仕様は [spec.md](spec.md)、今後の計画は [roadmap.md](roadmap.md)。
+
+> **実装状況**：旧 `install` 相当のロジック（取得 → 配置 → SKILL.md 生成 → telemetry）は実装済。`use` への改名 + 「DL スキップ分岐（取得済みなら切り替えのみ）」+ `clear` は未実装（[roadmap.md](roadmap.md)）。
 
 ---
 
 ## 1. サブコマンド
 
-### `install <user>/<name>`
+### `use <user>/<name>`
 
-サーバから Heart を取得し、`.claude/skills/heartcraft/` に配置 → SKILL.md を書き換えて即アクティブ化する。
+アクティブハートを `<user>/<name>` に切り替える。ローカルに無ければサーバから取得 → 配置、有れば SKILL.md 書き換えのみ。ユーザーから見ると「インストールも切り替えも同じコマンド」。
 
 ```sh
-npx heartcraft install hatarson/zundamon
+npx heartcraft use hatarson/zundamon
 ```
 
 #### フロー
 
 1. slug を `<user>/<name>` 形式でパース（各セグメントが `^[a-z0-9][a-z0-9_-]*$` にマッチ）
-2. `GET ${HEARTCRAFT_API_URL}/api/hearts/<user>/<name>` で frontmatter 付き Markdown を取得
-3. `.claude/skills/heartcraft/<user>/<name>.md` にレスポンス本体を書き込み
-4. `.claude/skills/heartcraft/SKILL.md` をフル再生成（アクティブ Heart 参照を含む）
-5. 成功メッセージを stdout に表示
-6. `POST /api/installs` で telemetry を fire-and-forget 送信（§4）
+2. `.claude/skills/heartcraft/<user>/<name>.md` の存在チェック。あれば手順 3-4 をスキップ
+3. `GET ${HEARTCRAFT_API_URL}/api/hearts/<user>/<name>` で frontmatter 付き Markdown を取得
+4. `.claude/skills/heartcraft/<user>/<name>.md` にレスポンス本体を書き込み
+5. `.claude/skills/heartcraft/SKILL.md` をフル再生成（アクティブ Heart 参照を含む）
+6. 成功メッセージを stdout に表示
+7. **DL が走った場合のみ** `POST /api/installs` で telemetry を fire-and-forget 送信（§4）
 
 #### エラーハンドリング
 
@@ -35,7 +38,23 @@ npx heartcraft install hatarson/zundamon
 | ネットワーク失敗 | `Cannot reach HeartCraftLab API at <url> (...)` | 1 |
 | 404 | `Heart not found: <slug>` | 1 |
 | その他 4xx/5xx | `API error (status): <body>` | 1 |
-| 成功 | `✓ <slug> をインストールしました（<description>）` + 配置パス | 0 |
+| 成功（DL あり） | `✓ <slug> をインストールしました（<description>）` + 配置パス | 0 |
+| 成功（切り替えのみ） | `✓ <slug> に切り替えました` + 配置パス | 0 |
+
+### `clear`
+
+SKILL.md のアクティブ参照をクリアして、Claude Code がハートプロンプトを適用しない状態に戻す。配置済みファイルは残すので、後で `use` するとサーバへのアクセスなしで復帰できる。
+
+```sh
+npx heartcraft clear
+```
+
+#### 出力
+
+| 状況 | 出力 | 終了コード |
+|---|---|---|
+| 成功 | `✓ アクティブなハートプロンプトを解除しました` | 0 |
+| SKILL.md が見つからない | `No active heart prompt to clear.` | 0 |
 
 ---
 
@@ -60,7 +79,7 @@ npx heartcraft install hatarson/zundamon
 
 ## 4. Install Telemetry（fire-and-forget）
 
-install 成功時に `POST ${HEARTCRAFT_API_URL}/api/installs` を **best-effort** で送信し、サーバ側でユニーク install 数（KPI）を集計する。
+`use` で**新規 DL が走った時のみ** `POST ${HEARTCRAFT_API_URL}/api/installs` を **best-effort** で送信し、サーバ側でユニーク install 数（KPI）を集計する。切り替えのみ・`clear` は送信しない。
 
 ### 送信内容
 
@@ -76,7 +95,7 @@ install 成功時に `POST ${HEARTCRAFT_API_URL}/api/installs` を **best-effort
 ### 失敗時の挙動
 
 - ネットワーク失敗・4xx/5xx・タイムアウト（2秒 hard）はすべて **silent skip**
-- install 自体の成否・出力には影響しない
+- `use` 自体の成否・出力には影響しない
 - 不正な OS（freebsd 等）・不正な slug・machineId 取得失敗時もスキップ（KPI を歪めないため）
 
 ### プライバシー
@@ -117,7 +136,7 @@ description: HeartCraftLab で配信される人格（Heart）を ... 必ずこ�
 このスキルが読み込まれたら、必ず同ディレクトリの **<user>/<name>.md** を読み込み、そこに書かれた人格指示を会話全体に適用する。
 ```
 
-アクティブ Heart が無い場合：本文を `現在アクティブな Heart はありません。` に差し替え（コードパスとしては存在、現状の install では到達しない）。
+アクティブ Heart が無い場合（`clear` 実行後）：本文を `現在アクティブな Heart はありません。` に差し替え。
 
 ---
 
@@ -136,7 +155,9 @@ description: HeartCraftLab で配信される人格（Heart）を ... 必ずこ�
 
 | 機能 | 状態 |
 |---|---|
-| `switch` / `list` / `uninstall` / `search` | 未実装（[roadmap.md](roadmap.md)） |
+| `use` の DL スキップ分岐（既存ファイル検知して切り替えのみ） | 未実装（[roadmap.md](roadmap.md)） |
+| `clear` | 未実装（[roadmap.md](roadmap.md)） |
+| `list` / `search` | MVP 対象外（Phase 2 以降） |
 | atomic write（破壊事故防止） | 未実装 |
 | dry-run モード | 未実装 |
 | バックアップ作成 | 未実装 |

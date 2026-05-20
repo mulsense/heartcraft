@@ -8,7 +8,7 @@
 
 ## 1. 設計目標
 
-> 「ネット検索 + コピペ + メモ帳保存」という DIY ワークフローに対し、`npx heartcraft install <slug>` の1コマンドで勝負する。
+> 「ネット検索 + コピペ + メモ帳保存」という DIY ワークフローに対し、`npx heartcraft use <slug>` の1コマンドで勝負する。
 
 - インストールしたら**即適用**（再起動・追加設定なし）
 - インストール先のディレクトリ構造は**ユーザーが見て理解できる**（透明性）
@@ -18,28 +18,35 @@
 
 ## 2. サブコマンド
 
-MVP では `install` のみ実装済。他は順次。
+**設計方針**：基本は `use` だけ知っていれば使える。インストール / 切り替えの状態差はユーザーが意識しなくていい（未取得ならサーバから DL、取得済みなら SKILL.md 書き換えのみ）。
+
+MVP では `use` 系を実装。`list` / `search` は MVP 対象外（Phase 2 以降）。
 
 | コマンド | 動作 | 状態 |
 |---|---|---|
-| `install <user>/<name>` | サーバから Heart を取得 → ファイル配置 → SKILL.md 書き換え（即アクティブ化） | ✅ 実装済 |
-| `switch <user>/<name>` | インストール済 Heart のアクティブを切り替え（DL なし） | 未実装 |
-| `list` | インストール済 Heart 一覧 + 現在アクティブを表示 | 未実装 |
-| `uninstall <user>/<name>` | Heart 削除。アクティブだった場合は参照クリア | 未実装 |
-| `search <keyword>` | サーバ検索 API を叩いて結果表示 | 未実装 |
+| `use <user>/<name>` | アクティブハートを `<user>/<name>` にする。ローカルに無ければサーバから取得 → 配置、有れば SKILL.md 書き換えのみ。即アクティブ化 | 部分実装（旧 `install` 相当） |
+| `clear` | SKILL.md のアクティブ参照をクリア（ハートプロンプト適用停止）。配置済みファイルは残す | 未実装 |
+| `list` | インストール済 Heart 一覧 + 現在アクティブを表示 | MVP 対象外 |
+| `search <keyword>` | サーバ検索 API を叩いて結果表示 | MVP 対象外 |
 
-### install のフロー
+### use のフロー
 
 1. **slug パース**：`<user>/<name>` 形式、両セグメントが `^[a-z0-9][a-z0-9_-]*$` にマッチすることを確認
-2. **API 呼び出し**：`GET ${HEARTCRAFT_API_URL}/api/hearts/${user}/${name}`
-3. **レスポンス処理**：
+2. **ローカル存在チェック**：`.claude/skills/heartcraft/<user>/<name>.md` が既に存在する場合は手順 3-4 をスキップ
+3. **API 呼び出し**：`GET ${HEARTCRAFT_API_URL}/api/hearts/${user}/${name}`
    - 404 → `Heart not found: <slug>`
    - その他 4xx/5xx → エラーメッセージ
    - ネットワーク失敗 → `Cannot reach HeartCraftLab API at ${apiUrl}` + ヒント
 4. **保存**：`.claude/skills/heartcraft/<user>/<name>.md` にレスポンス body をそのまま書く（frontmatter 込み）
 5. **SKILL.md 生成**：アクティブ Heart 参照を含む SKILL.md を毎回フル再生成
-6. **成功表示**：`✓ <slug> をインストールしました（<description>）` + 配置パス
-7. **telemetry 送信（best-effort）**：`POST ${HEARTCRAFT_API_URL}/api/installs` を fire-and-forget で叩く。失敗・タイムアウト（2秒）しても install 自体は成功扱いで、出力にも現れない。詳細は §10。
+6. **成功表示**：DL が走った場合は `✓ <slug> をインストールしました（<description>）`、切り替えのみなら `✓ <slug> に切り替えました` + 配置パス
+7. **telemetry 送信（best-effort）**：DL が走った場合のみ `POST ${HEARTCRAFT_API_URL}/api/installs` を fire-and-forget で叩く。失敗・タイムアウト（2秒）しても use 自体は成功扱いで、出力にも現れない。詳細は §10。
+
+### clear のフロー
+
+1. **SKILL.md 再生成**：アクティブ Heart 参照を「現在アクティブな Heart はありません」に差し替えて上書き
+2. **成功表示**：`✓ アクティブなハートプロンプトを解除しました`
+3. ファイル削除は行わない（再度 `use` で復帰できるように残す）
 
 ---
 
@@ -74,7 +81,7 @@ description: HeartCraftLab で配信される人格（Heart）を Claude Code �
 このスキルが読み込まれたら、必ず同ディレクトリの **<user>/<name>.md** を読み込み、そこに書かれた人格指示を会話全体に適用する。
 ```
 
-アクティブが無い場合：本文を `現在アクティブな Heart はありません。` に差し替える。
+アクティブが無い場合（`clear` 実行後）：本文を `現在アクティブな Heart はありません。` に差し替える。
 
 ---
 
@@ -130,7 +137,7 @@ CLI が `process.exit(1)` する場合は必ず `✗ <理由>` を stderr に出
 ## 8. テスト戦略
 
 - **slug.ts / skill.ts** — pure 関数、直接ユニットテスト
-- **install.ts** — `vi.spyOn(globalThis, 'fetch')` で API モック、`mkdtemp` で一時ディレクトリに対して I/O 検証
+- **use.ts / clear.ts** — `vi.spyOn(globalThis, 'fetch')` で API モック、`mkdtemp` で一時ディレクトリに対して I/O 検証。`use` は「DL あり」「DL スキップ（取得済み）」の両分岐をテスト
 - **cli.ts** — `execFileSync('npx', ['tsx', cliPath, '--version'])` 等のスモークのみ。ネットワークに依存させない
 
 ---
@@ -150,11 +157,12 @@ CLI が `process.exit(1)` する場合は必ず `✗ <理由>` を stderr に出
 
 ## 10. Install Telemetry
 
-install 成功時に `POST /api/installs` を fire-and-forget で叩き、サーバ側でユニーク install 数を集計する（KPI）。
+`use` で**新規 DL が走った時**だけ `POST /api/installs` を fire-and-forget で叩き、サーバ側でユニーク install 数を集計する（KPI）。
+切り替えのみ（ローカル存在のため DL スキップ）の場合は送信しない。`clear` も送信しない。
 
 ### 送信タイミング
 
-`install` フローの **最後**（heart ファイル書き込み + SKILL.md 生成完了後）。
+`use` フローの **最後**（heart ファイル書き込み + SKILL.md 生成完了後、かつ DL が実際に走った場合のみ）。
 ユーザーへの成功表示には影響しない（telemetry の成否は出力しない）。
 
 ### Payload
@@ -195,7 +203,7 @@ install 成功時に `POST /api/installs` を fire-and-forget で叩き、サー
 | 不正な OS（freebsd 等）| silent skip（サーバ enum は `darwin / linux / win32` のみ） |
 | 不正な slug / cliVersion | silent skip（サーバを 422 で困らせない） |
 
-CLI が固まる・install が失敗する余地を絶対に作らない。
+CLI が固まる・use が失敗する余地を絶対に作らない。
 
 ### プライバシー
 
