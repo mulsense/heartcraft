@@ -6,13 +6,13 @@ import { extractDescription } from '../lib/skill.js';
 import { recordInstall } from '../lib/telemetry.js';
 import { readCliVersion } from '../lib/version.js';
 
-const DEFAULT_API_URL = 'http://localhost';
+const DEFAULT_API_URL = 'https://heartcraftlab.com';
 
 export interface UseOptions {
   slug: string;
   /** Heart ファイルを書き出すベースディレクトリ。デフォルトは process.cwd()。 */
   baseDir?: string;
-  /** サーバ API のベース URL。デフォルトは env HEARTCRAFT_API_URL or http://localhost */
+  /** サーバ API のベース URL。デフォルトは env HEARTCRAFT_API_URL or https://heartcraftlab.com */
   apiUrl?: string;
   /** テスト DI: 検知済 agent を直接渡す。指定したら detectAgents をスキップする。 */
   agents?: readonly AgentAdapter[];

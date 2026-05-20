@@ -179,7 +179,7 @@ CLI は `description` を抽出して成功表示に使う。`name` / `creator` 
 
 | 変数 | デフォルト | 用途 |
 |---|---|---|
-| `HEARTCRAFT_API_URL` | `http://localhost` | サーバ URL の上書き（本番では `https://heartcraftlab.com` を想定） |
+| `HEARTCRAFT_API_URL` | `https://heartcraftlab.com` | サーバ URL の上書き（ローカル開発時は `http://localhost` を指定） |
 
 ---
 

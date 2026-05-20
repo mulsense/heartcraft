@@ -6,7 +6,7 @@
 Claude Code に1コマンドで導入する CLI。
 
 ```sh
-npx heartcraft use hatarson/zundamon
+npx heartcraft use master/zundamon
 ```
 
 サーバから frontmatter 付き Markdown を取得し、`.claude/skills/heartcraft/<user>/<name>.md`
@@ -38,11 +38,11 @@ npx heartcraft use hatarson/zundamon
 3. 任意の作業ディレクトリで実行：
    ```sh
    cd $(mktemp -d)
-   node /Users/furihata/Documents/GitHub/heartcraft/dist/cli.js use hatarson/zundamon
+   node /Users/furihata/Documents/GitHub/heartcraft/dist/cli.js use master/zundamon
    claude   # 新規 Claude Code セッション → 人格適用確認
    ```
 
-`HEARTCRAFT_API_URL` 環境変数でサーバ URL を上書き可（デフォルト `http://localhost`）。
+`HEARTCRAFT_API_URL` 環境変数でサーバ URL を上書き可（デフォルト `https://heartcraftlab.com`。ローカル開発時は `http://localhost` を指定）。
 
 ## ディレクトリ構成
 

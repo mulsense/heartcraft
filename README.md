@@ -4,7 +4,7 @@
 Claude Code に1コマンドで導入する CLI です。
 
 ```sh
-npx heartcraft use tanaka/zundamon
+npx heartcraft use master/zundamon
 ```
 
 ## ステータス

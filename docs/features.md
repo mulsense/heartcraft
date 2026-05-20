@@ -16,7 +16,7 @@
 アクティブハートを `<user>/<name>` に切り替える。ローカルに無ければサーバから取得 → 配置、有れば SKILL.md 書き換えのみ。ユーザーから見ると「インストールも切り替えも同じコマンド」。
 
 ```sh
-npx heartcraft use hatarson/zundamon
+npx heartcraft use master/zundamon
 ```
 
 #### フロー
@@ -71,9 +71,9 @@ npx heartcraft clear
 
 | 変数 | デフォルト | 用途 |
 |---|---|---|
-| `HEARTCRAFT_API_URL` | `http://localhost` | サーバ URL の上書き（本番リリース時に `https://heartcraftlab.com` 想定） |
+| `HEARTCRAFT_API_URL` | `https://heartcraftlab.com` | サーバ URL の上書き（ローカル開発時は `http://localhost` を指定） |
 
-末尾のスラッシュは自動で除去される（`http://localhost/` でも OK）。
+末尾のスラッシュは自動で除去される（`https://heartcraftlab.com/` でも OK）。
 
 ---
 
