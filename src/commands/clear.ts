@@ -1,6 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
 import { detectAgents, type AgentAdapter } from '../lib/agents.js';
+import { writeFileEnsureDir } from '../lib/fs.js';
 
 export interface ClearOptions {
   /** SKILL.md 等 activation ファイルを書き出すベースディレクトリ。デフォルトは process.cwd()。 */
@@ -17,11 +16,6 @@ export interface ClearAgentResult {
 
 export interface ClearResult {
   agents: ClearAgentResult[];
-}
-
-async function writeFileEnsureDir(path: string, content: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, content, 'utf8');
 }
 
 /**

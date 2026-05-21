@@ -1,6 +1,6 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { detectAgents, findCachedHeart, type AgentAdapter } from '../lib/agents.js';
+import { writeFileEnsureDir } from '../lib/fs.js';
 import { parseSlug } from '../lib/slug.js';
 import { extractDescription, extractName } from '../lib/skill.js';
 import { recordInstall } from '../lib/telemetry.js';
@@ -37,11 +37,6 @@ export interface UseResult {
   name: string | null;
   /** DL したときは frontmatter から取り出した description。DL スキップ時は null。 */
   description: string | null;
-}
-
-async function writeFileEnsureDir(path: string, content: string): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, content, 'utf8');
 }
 
 async function fetchHeart(apiUrl: string, user: string, name: string): Promise<string> {

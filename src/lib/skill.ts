@@ -32,75 +32,44 @@ ${body}
 `;
 }
 
-/** Cursor: MDC ルール。`alwaysApply: true` で常時適用。Heart 本体をインラインで埋め込む。 */
-export function renderCursorRule(active: HeartSlug | null, heartBody: string | null): string {
+/**
+ * Heart 本体をインライン埋め込みする agent 向けの共通レンダラ。
+ * - frontmatter が空文字なら frontmatter ブロックを出さない（Gemini CLI 用）
+ * - active === null または heartBody === null なら inactive 表示
+ */
+function renderHeartBlock(
+  active: HeartSlug | null,
+  heartBody: string | null,
+  frontmatter: string,
+): string {
+  const fm = frontmatter === '' ? '' : `---\n${frontmatter}\n---\n\n`;
   if (active === null || heartBody === null) {
-    return `---
-description: ${SKILL_DESCRIPTION}
-alwaysApply: true
----
-
-# HeartCraftLab Heart Loader
+    return `${fm}# HeartCraftLab Heart Loader
 
 ${INACTIVE_MESSAGE}
 `;
   }
-
-  return `---
-description: ${SKILL_DESCRIPTION}
-alwaysApply: true
----
-
-# HeartCraftLab Heart Loader (${active.user}/${active.name})
+  return `${fm}# HeartCraftLab Heart Loader (${active.user}/${active.name})
 
 ${APPLY_INSTRUCTION}
 
 ${stripFrontmatter(heartBody)}
 `;
+}
+
+/** Cursor: MDC ルール。`alwaysApply: true` で常時適用。Heart 本体をインラインで埋め込む。 */
+export function renderCursorRule(active: HeartSlug | null, heartBody: string | null): string {
+  return renderHeartBlock(active, heartBody, `description: ${SKILL_DESCRIPTION}\nalwaysApply: true`);
 }
 
 /** Copilot: `*.instructions.md`。`applyTo: '**'` で常時適用。Heart 本体をインラインで埋め込む。 */
 export function renderCopilotInstructions(active: HeartSlug | null, heartBody: string | null): string {
-  if (active === null || heartBody === null) {
-    return `---
-description: ${SKILL_DESCRIPTION}
-applyTo: '**'
----
-
-# HeartCraftLab Heart Loader
-
-${INACTIVE_MESSAGE}
-`;
-  }
-
-  return `---
-description: ${SKILL_DESCRIPTION}
-applyTo: '**'
----
-
-# HeartCraftLab Heart Loader (${active.user}/${active.name})
-
-${APPLY_INSTRUCTION}
-
-${stripFrontmatter(heartBody)}
-`;
+  return renderHeartBlock(active, heartBody, `description: ${SKILL_DESCRIPTION}\napplyTo: '**'`);
 }
 
 /** Gemini CLI: extension の GEMINI.md。Heart 本体をインラインで埋め込む。 */
 export function renderGeminiMd(active: HeartSlug | null, heartBody: string | null): string {
-  if (active === null || heartBody === null) {
-    return `# HeartCraftLab Heart Loader
-
-${INACTIVE_MESSAGE}
-`;
-  }
-
-  return `# HeartCraftLab Heart Loader (${active.user}/${active.name})
-
-${APPLY_INSTRUCTION}
-
-${stripFrontmatter(heartBody)}
-`;
+  return renderHeartBlock(active, heartBody, '');
 }
 
 /** Gemini CLI: extension マニフェスト（最小構成） */
