@@ -164,14 +164,19 @@ applyTo: '**'
 
 ```yaml
 ---
-name: <heart-name>
+name: <キャラクター表示名（その言語版） 例: ずんだもん>
+slug: <識別子 例: zundamon>
 creator: <user-name>
 description: <短い説明>
 version: 1
 ---
 ```
 
-CLI は `description` を抽出して成功表示に使う。`name` / `creator` は今のところ表示用途のみ。
+- `name` は `heart_prompts.name`（言語別のキャラクター表示名）。
+- `slug` は識別子（`hearts.slug`）。CLI が `<user>/<slug>` を組み立てる際に使うが、CLI 引数として既に渡されているため重複情報として保持される。
+- CLI は `description` と `name` を抽出して成功表示に使う：
+  - `name` が空でない場合：`✓ ずんだもん (tanaka/zundamon) を ... にインストールしました（<description>）`
+  - `name` が空の場合（フォールバック）：`✓ tanaka/zundamon を ... にインストールしました（<description>）`
 
 ---
 

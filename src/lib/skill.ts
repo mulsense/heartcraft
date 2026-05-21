@@ -115,15 +115,28 @@ export function renderGeminiManifest(version: string): string {
 
 /** frontmatter 付き Markdown から description 行を取り出す。なければ空文字。 */
 export function extractDescription(content: string): string {
+  return extractScalar(content, 'description');
+}
+
+/**
+ * frontmatter 付き Markdown から name 行（キャラクター表示名）を取り出す。なければ空文字。
+ * API v1 では frontmatter の `name` は heart_prompts.name（その言語版の表示名、例: ずんだもん）。
+ * 識別子 (slug) は別フィールド `slug:` で配信される。
+ */
+export function extractName(content: string): string {
+  return extractScalar(content, 'name');
+}
+
+function extractScalar(content: string, key: string): string {
   const fm = content.match(/^---\n([\s\S]*?)\n---/);
   if (fm === null) {
     return '';
   }
-  const desc = fm[1].match(/^description:\s*(.+)$/m);
-  if (desc === null) {
+  const line = fm[1].match(new RegExp(`^${key}:\\s*(.+)$`, 'm'));
+  if (line === null) {
     return '';
   }
-  return desc[1].trim().replace(/^['"]|['"]$/g, '');
+  return line[1].trim().replace(/^['"]|['"]$/g, '');
 }
 
 /** frontmatter ブロックを取り除いて本文だけ返す。frontmatter が無ければそのまま返す。 */

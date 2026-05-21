@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { detectAgents, findCachedHeart, type AgentAdapter } from '../lib/agents.js';
 import { parseSlug } from '../lib/slug.js';
-import { extractDescription } from '../lib/skill.js';
+import { extractDescription, extractName } from '../lib/skill.js';
 import { recordInstall } from '../lib/telemetry.js';
 import { readCliVersion } from '../lib/version.js';
 
@@ -30,6 +30,11 @@ export interface UseResult {
   agents: UseAgentResult[];
   /** サーバから DL が走ったかどうか。 */
   downloaded: boolean;
+  /**
+   * DL したときは frontmatter から取り出したキャラクター表示名（heart_prompts.name 相当、例: ずんだもん）。
+   * frontmatter に name が無い場合は空文字。DL スキップ時は null。
+   */
+  name: string | null;
   /** DL したときは frontmatter から取り出した description。DL スキップ時は null。 */
   description: string | null;
 }
@@ -72,6 +77,7 @@ export async function runUse(opts: UseOptions): Promise<UseResult> {
   const cachedPath = await findCachedHeart(baseDir, slug, agents);
   let heartBody: string;
   let downloaded = false;
+  let name: string | null = null;
   let description: string | null = null;
 
   if (cachedPath !== null) {
@@ -79,6 +85,7 @@ export async function runUse(opts: UseOptions): Promise<UseResult> {
   } else {
     heartBody = await fetchHeart(apiUrl, slug.user, slug.name);
     downloaded = true;
+    name = extractName(heartBody);
     description = extractDescription(heartBody);
   }
 
@@ -115,7 +122,7 @@ export async function runUse(opts: UseOptions): Promise<UseResult> {
     }
   }
 
-  return { agents: results, downloaded, description };
+  return { agents: results, downloaded, name, description };
 }
 
 /** commander action 用の薄いラッパー */
@@ -123,10 +130,15 @@ export async function useCommand(slug: string): Promise<void> {
   const result = await runUse({ slug });
 
   const verb = result.downloaded ? 'インストールしました' : '切り替えました';
+  // DL 時のみ表示名を出す。frontmatter に name (キャラクター表示名) があれば「<表示名> (<slug>)」、なければ「<slug>」のみ。
+  const headline =
+    result.downloaded && result.name !== null && result.name !== ''
+      ? `${result.name} (${slug})`
+      : slug;
   const descLabel = result.downloaded && result.description !== null && result.description !== ''
     ? `（${result.description}）`
     : '';
-  console.log(`✓ ${slug} を ${result.agents.map((a) => a.displayName).join(' / ')} に${verb}${descLabel}`);
+  console.log(`✓ ${headline} を ${result.agents.map((a) => a.displayName).join(' / ')} に${verb}${descLabel}`);
 
   for (const a of result.agents) {
     console.log(`  [${a.displayName}]`);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   extractDescription,
+  extractName,
   renderCopilotInstructions,
   renderCursorRule,
   renderGeminiManifest,
@@ -8,8 +9,10 @@ import {
   renderSkillMd,
 } from '../src/lib/skill.js';
 
+// API v1 の frontmatter 形式：name はキャラクター表示名（heart_prompts.name）、slug は識別子。
 const HEART_BODY = `---
-name: zundamon
+name: ずんだもん
+slug: zundamon
 creator: tanaka
 description: '明るく元気なずんだもん人格'
 ---
@@ -69,7 +72,9 @@ describe('renderGeminiMd', () => {
     const out = renderGeminiMd({ user: 'tanaka', name: 'zundamon' }, HEART_BODY);
     expect(out).toContain('# HeartCraftLab Heart Loader (tanaka/zundamon)');
     expect(out).toContain('あなたはずんだもんなのだ。');
-    expect(out).not.toContain('name: zundamon\n');
+    // インライン時に frontmatter は剥がす
+    expect(out).not.toContain('creator: tanaka');
+    expect(out).not.toContain('slug: zundamon');
   });
 
   it('falls back to inactive message when null', () => {
@@ -105,5 +110,24 @@ describe('extractDescription', () => {
 
   it('returns empty when description missing', () => {
     expect(extractDescription('---\nname: x\n---\nbody')).toBe('');
+  });
+});
+
+describe('extractName', () => {
+  it('extracts the localized character name', () => {
+    expect(extractName(HEART_BODY)).toBe('ずんだもん');
+  });
+
+  it('strips surrounding single quotes (Yaml::dump output)', () => {
+    const md = "---\nname: 'ギャル'\nslug: gal\n---\nbody";
+    expect(extractName(md)).toBe('ギャル');
+  });
+
+  it('returns empty when no frontmatter', () => {
+    expect(extractName('just body')).toBe('');
+  });
+
+  it('returns empty when name missing', () => {
+    expect(extractName('---\nslug: x\n---\nbody')).toBe('');
   });
 });

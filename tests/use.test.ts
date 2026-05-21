@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runUse } from '../src/commands/use.js';
 import { claudeCodeAdapter, cursorAdapter } from '../src/lib/agents.js';
 
+// API v1 の frontmatter 形式：name はキャラクター表示名（heart_prompts.name）、slug は識別子。
 const HEART_BODY = `---
-name: zundamon
+name: ずんだもん
+slug: zundamon
 creator: tanaka
 description: '明るく元気なずんだもん人格'
 version: 1
@@ -41,6 +43,7 @@ describe('runUse', () => {
     });
 
     expect(result.downloaded).toBe(true);
+    expect(result.name).toBe('ずんだもん');
     expect(result.description).toBe('明るく元気なずんだもん人格');
     expect(result.agents).toHaveLength(1);
     expect(result.agents[0].agent).toBe('claude-code');
@@ -66,6 +69,7 @@ describe('runUse', () => {
     });
 
     expect(result.downloaded).toBe(false);
+    expect(result.name).toBeNull();
     expect(result.description).toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
 
@@ -163,6 +167,7 @@ describe('runUse', () => {
     });
 
     expect(result.downloaded).toBe(true);
+    expect(result.name).toBe('ずんだもん');
     expect(result.description).toBe('明るく元気なずんだもん人格');
     const heart = await readFile(join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md'), 'utf8');
     expect(heart).toBe(HEART_BODY);
