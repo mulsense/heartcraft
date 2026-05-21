@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   ALL_ADAPTERS,
   claudeCodeAdapter,
+  codexAdapter,
   copilotAdapter,
   cursorAdapter,
   detectAgents,
@@ -64,6 +65,11 @@ describe('agent adapters - detect', () => {
     expect(await geminiCliAdapter.detect(tmp)).toBe(true);
   });
 
+  it('Codex: detects .codex/', async () => {
+    await mkdir(join(tmp, '.codex'), { recursive: true });
+    expect(await codexAdapter.detect(tmp)).toBe(true);
+  });
+
   it('returns false when no markers exist', async () => {
     for (const adapter of ALL_ADAPTERS) {
       expect(await adapter.detect(tmp)).toBe(false);
@@ -97,14 +103,21 @@ describe('detectAgents', () => {
     expect(detected[0].name).toBe('claude-code');
   });
 
-  it('returns all 4 agents when all markers exist', async () => {
+  it('returns all 5 agents when all markers exist', async () => {
     await writeFile(join(tmp, 'CLAUDE.md'), '', 'utf8');
     await mkdir(join(tmp, '.cursor'), { recursive: true });
     await mkdir(join(tmp, '.github/instructions'), { recursive: true });
     await writeFile(join(tmp, 'GEMINI.md'), '', 'utf8');
+    await mkdir(join(tmp, '.codex'), { recursive: true });
 
     const detected = await detectAgents(tmp);
-    expect(detected.map((a) => a.name)).toEqual(['claude-code', 'cursor', 'copilot', 'gemini-cli']);
+    expect(detected.map((a) => a.name)).toEqual([
+      'claude-code',
+      'cursor',
+      'copilot',
+      'gemini-cli',
+      'codex',
+    ]);
   });
 });
 

@@ -24,7 +24,7 @@ MVP では `use` 系を実装。`list` / `search` は MVP 対象外（Phase 2 �
 
 | コマンド | 動作 | 状態 |
 |---|---|---|
-| `use <user>/<name>` | アクティブハートを `<user>/<name>` にする。検知された AI エージェント（Claude Code / Cursor / Copilot / Gemini CLI）ごとに Heart 本体 + activation ファイルを配置。検知無しなら Claude Code にフォールバック。ローカルに無ければサーバから DL、有れば activation 書き換えのみ。即アクティブ化 | 実装済 |
+| `use <user>/<name>` | アクティブハートを `<user>/<name>` にする。検知された AI エージェント（Claude Code / Cursor / Copilot / Gemini CLI / Codex）ごとに Heart 本体 + activation ファイルを配置。検知無しなら Claude Code にフォールバック。ローカルに無ければサーバから DL、有れば activation 書き換えのみ。即アクティブ化 | 実装済 |
 | `clear` | 検知された各 agent の activation ファイルのアクティブ参照をクリア（ハートプロンプト適用停止）。配置済み Heart 本体は残す | 実装済 |
 | `list` | インストール済 Heart 一覧 + 現在アクティブを表示 | MVP 対象外 |
 | `search <keyword>` | サーバ検索 API を叩いて結果表示 | MVP 対象外 |
@@ -63,6 +63,7 @@ MVP では `use` 系を実装。`list` / `search` は MVP 対象外（Phase 2 �
 | **Cursor** | `.cursor/` or `.cursorrules` | `.cursor/rules/heartcraft/<user>/<name>.md` | `.cursor/rules/heartcraft.mdc` |
 | **GitHub Copilot** | `.github/copilot-instructions.md` or `.github/instructions/` | `.github/instructions/heartcraft/<user>/<name>.md` | `.github/instructions/heartcraft.instructions.md` |
 | **Gemini CLI** | `GEMINI.md` or `.gemini/` | `.gemini/extensions/heartcraft/hearts/<user>/<name>.md` | `.gemini/extensions/heartcraft/gemini-extension.json` + `.gemini/extensions/heartcraft/GEMINI.md` |
+| **Codex** | `.codex/` | `.codex/skills/heartcraft/<user>/<name>.md` | `.codex/skills/heartcraft/SKILL.md` |
 
 **フォールバック**：どの marker も無ければ Claude Code として配置する（最大ユーザー数を想定した既定動作）。
 

@@ -129,6 +129,29 @@ export const copilotAdapter: AgentAdapter = {
   },
 };
 
+// ---------- Codex ----------
+
+const CODEX_SKILLS_DIR = '.codex/skills/heartcraft';
+
+export const codexAdapter: AgentAdapter = {
+  name: 'codex',
+  displayName: 'Codex',
+  async detect(baseDir) {
+    return anyExists(baseDir, ['.codex']);
+  },
+  heartPath(baseDir, slug) {
+    return resolve(baseDir, CODEX_SKILLS_DIR, slug.user, `${slug.name}.md`);
+  },
+  renderActivation(baseDir, slug) {
+    return [
+      {
+        path: resolve(baseDir, CODEX_SKILLS_DIR, 'SKILL.md'),
+        content: renderSkillMd(slug),
+      },
+    ];
+  },
+};
+
 // ---------- Gemini CLI ----------
 
 const GEMINI_EXTENSION_DIR = '.gemini/extensions/heartcraft';
@@ -168,6 +191,7 @@ export const ALL_ADAPTERS: readonly AgentAdapter[] = [
   cursorAdapter,
   copilotAdapter,
   geminiCliAdapter,
+  codexAdapter,
 ];
 
 /**
