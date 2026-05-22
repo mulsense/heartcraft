@@ -30,10 +30,10 @@ export interface AgentAdapter {
   /** Heart 本体 Markdown を書き出す絶対パス */
   heartPath(baseDir: string, slug: HeartSlug): string;
   /**
-   * 活性化ファイル群（パス + 内容）。
-   * @param heartBody Heart 本体 Markdown（インライン埋め込みする agent 用）。Claude Code は同ディレクトリ参照で済むため使わない。
+   * 活性化ファイル群（パス + 内容）。Heart 本体は全 agent でインライン埋め込みする。
+   * @param heartBody Heart 本体 Markdown（frontmatter 込み）
    */
-  renderActivation(baseDir: string, slug: HeartSlug | null, heartBody: string | null): ActivationFile[];
+  renderActivation(baseDir: string, slug: HeartSlug, heartBody: string): ActivationFile[];
   /** clear が削除する activation ファイルの絶対パス群。 */
   activationPaths(baseDir: string): string[];
 }
@@ -70,11 +70,11 @@ export const claudeCodeAdapter: AgentAdapter = {
   heartPath(baseDir, slug) {
     return resolve(baseDir, CLAUDE_SKILLS_DIR, slug.user, `${slug.name}.md`);
   },
-  renderActivation(baseDir, slug) {
+  renderActivation(baseDir, slug, heartBody) {
     return [
       {
         path: resolve(baseDir, CLAUDE_SKILLS_DIR, 'SKILL.md'),
-        content: renderSkillMd(slug),
+        content: renderSkillMd(slug, heartBody),
       },
     ];
   },
@@ -153,11 +153,11 @@ export const codexAdapter: AgentAdapter = {
   heartPath(baseDir, slug) {
     return resolve(baseDir, CODEX_SKILLS_DIR, slug.user, `${slug.name}.md`);
   },
-  renderActivation(baseDir, slug) {
+  renderActivation(baseDir, slug, heartBody) {
     return [
       {
         path: resolve(baseDir, CODEX_SKILLS_DIR, 'SKILL.md'),
-        content: renderSkillMd(slug),
+        content: renderSkillMd(slug, heartBody),
       },
     ];
   },

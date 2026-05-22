@@ -52,7 +52,8 @@ describe('runUse', () => {
     expect(heart).toBe(HEART_BODY);
 
     const skill = await readFile(join(tmp, '.claude/skills/heartcraft/SKILL.md'), 'utf8');
-    expect(skill).toContain('**tanaka/zundamon.md**');
+    expect(skill).toContain('# HeartCraftLab Heart Loader (tanaka/zundamon)');
+    expect(skill).toContain('あなたはずんだもんなのだ。');
   });
 
   it('skips download when the heart file already exists locally', async () => {
@@ -77,7 +78,8 @@ describe('runUse', () => {
     expect(heart).toBe(HEART_BODY);
 
     const skill = await readFile(join(tmp, '.claude/skills/heartcraft/SKILL.md'), 'utf8');
-    expect(skill).toContain('**tanaka/zundamon.md**');
+    expect(skill).toContain('# HeartCraftLab Heart Loader (tanaka/zundamon)');
+    expect(skill).toContain('あなたはずんだもんなのだ。');
   });
 
   it('throws on 404 with a clear message', async () => {
@@ -197,9 +199,12 @@ describe('runUse', () => {
     expect(
       await readFile(join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md'), 'utf8'),
     ).toBe(HEART_BODY);
-    expect(
-      await readFile(join(tmp, '.claude/skills/heartcraft/SKILL.md'), 'utf8'),
-    ).toContain('**tanaka/zundamon.md**');
+    const claudeSkill = await readFile(
+      join(tmp, '.claude/skills/heartcraft/SKILL.md'),
+      'utf8',
+    );
+    expect(claudeSkill).toContain('# HeartCraftLab Heart Loader (tanaka/zundamon)');
+    expect(claudeSkill).toContain('あなたはずんだもんなのだ。');
 
     // Cursor: Heart + MDC
     expect(

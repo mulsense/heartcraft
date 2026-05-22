@@ -23,15 +23,15 @@ description: '明るく元気なずんだもん人格'
 `;
 
 describe('renderSkillMd', () => {
-  it('includes the active heart path when given', () => {
-    const out = renderSkillMd({ user: 'tanaka', name: 'zundamon' });
-    expect(out).toContain('**tanaka/zundamon.md**');
+  it('embeds the heart body inline below the skill frontmatter', () => {
+    const out = renderSkillMd({ user: 'tanaka', name: 'zundamon' }, HEART_BODY);
     expect(out).toContain('name: heartcraft');
-  });
-
-  it('falls back to inactive message when null', () => {
-    const out = renderSkillMd(null);
-    expect(out).toContain('No Heart is currently active.');
+    expect(out).toContain('# HeartCraftLab Heart Loader (tanaka/zundamon)');
+    expect(out).toContain('あなたはずんだもんなのだ。');
+    // 人格本体の frontmatter は剥がす
+    expect(out).not.toContain('creator: tanaka');
+    // 旧形式の「別ファイル参照」は残っていない
+    expect(out).not.toContain('**tanaka/zundamon.md**');
   });
 });
 
@@ -45,11 +45,6 @@ describe('renderCursorRule', () => {
     expect(out).not.toContain('creator: tanaka');
   });
 
-  it('falls back to inactive message when null', () => {
-    const out = renderCursorRule(null, null);
-    expect(out).toContain('alwaysApply: true');
-    expect(out).toContain('No Heart is currently active.');
-  });
 });
 
 describe('renderCopilotInstructions', () => {
@@ -60,11 +55,6 @@ describe('renderCopilotInstructions', () => {
     expect(out).toContain('あなたはずんだもんなのだ。');
   });
 
-  it('falls back to inactive message when null', () => {
-    const out = renderCopilotInstructions(null, null);
-    expect(out).toContain("applyTo: '**'");
-    expect(out).toContain('No Heart is currently active.');
-  });
 });
 
 describe('renderGeminiMd', () => {
@@ -77,10 +67,6 @@ describe('renderGeminiMd', () => {
     expect(out).not.toContain('slug: zundamon');
   });
 
-  it('falls back to inactive message when null', () => {
-    const out = renderGeminiMd(null, null);
-    expect(out).toContain('No Heart is currently active.');
-  });
 });
 
 describe('renderGeminiManifest', () => {

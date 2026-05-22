@@ -11,44 +11,14 @@ const SKILL_DESCRIPTION =
   'Load the active Heart definition from the master/ directory in the same folder ' +
   'and apply that persona to all responses going forward."';
 
-const INACTIVE_MESSAGE = 'No Heart is currently active.';
-
 const APPLY_INSTRUCTION = 'Apply the following persona instructions to the entire conversation at all times.';
 
-/** Claude Code: SKILL.md（同ディレクトリの Heart ファイルを参照する） */
-export function renderSkillMd(active: HeartSlug | null): string {
-  const body = active === null
-    ? INACTIVE_MESSAGE
-    : `When this skill is loaded, immediately read **${active.user}/${active.name}.md** from the same directory and apply the persona instructions written there to the entire conversation.`;
-
-  return `---
-name: heartcraft
-description: ${SKILL_DESCRIPTION}
----
-
-# HeartCraftLab Heart Loader
-
-${body}
-`;
-}
-
 /**
- * Heart 本体をインライン埋め込みする agent 向けの共通レンダラ。
- * - frontmatter が空文字なら frontmatter ブロックを出さない（Gemini CLI 用）
- * - active === null または heartBody === null なら inactive 表示
+ * Heart 本体をインライン埋め込みする共通レンダラ。
+ * frontmatter が空文字なら frontmatter ブロックを出さない（Gemini CLI 用）。
  */
-function renderHeartBlock(
-  active: HeartSlug | null,
-  heartBody: string | null,
-  frontmatter: string,
-): string {
+function renderHeartBlock(active: HeartSlug, heartBody: string, frontmatter: string): string {
   const fm = frontmatter === '' ? '' : `---\n${frontmatter}\n---\n\n`;
-  if (active === null || heartBody === null) {
-    return `${fm}# HeartCraftLab Heart Loader
-
-${INACTIVE_MESSAGE}
-`;
-  }
   return `${fm}# HeartCraftLab Heart Loader (${active.user}/${active.name})
 
 ${APPLY_INSTRUCTION}
@@ -57,18 +27,23 @@ ${stripFrontmatter(heartBody)}
 `;
 }
 
+/** Claude Code / Codex: SKILL.md。frontmatter は維持し、Heart 本体をインライン埋め込みする。 */
+export function renderSkillMd(active: HeartSlug, heartBody: string): string {
+  return renderHeartBlock(active, heartBody, `name: heartcraft\ndescription: ${SKILL_DESCRIPTION}`);
+}
+
 /** Cursor: MDC ルール。`alwaysApply: true` で常時適用。Heart 本体をインラインで埋め込む。 */
-export function renderCursorRule(active: HeartSlug | null, heartBody: string | null): string {
+export function renderCursorRule(active: HeartSlug, heartBody: string): string {
   return renderHeartBlock(active, heartBody, `description: ${SKILL_DESCRIPTION}\nalwaysApply: true`);
 }
 
 /** Copilot: `*.instructions.md`。`applyTo: '**'` で常時適用。Heart 本体をインラインで埋め込む。 */
-export function renderCopilotInstructions(active: HeartSlug | null, heartBody: string | null): string {
+export function renderCopilotInstructions(active: HeartSlug, heartBody: string): string {
   return renderHeartBlock(active, heartBody, `description: ${SKILL_DESCRIPTION}\napplyTo: '**'`);
 }
 
 /** Gemini CLI: extension の GEMINI.md。Heart 本体をインラインで埋め込む。 */
-export function renderGeminiMd(active: HeartSlug | null, heartBody: string | null): string {
+export function renderGeminiMd(active: HeartSlug, heartBody: string): string {
   return renderHeartBlock(active, heartBody, '');
 }
 
