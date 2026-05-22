@@ -18,7 +18,7 @@
 
 ## 2. サブコマンド
 
-**設計方針**：基本は `use` だけ知っていれば使える。インストール / 切り替えの状態差はユーザーが意識しなくていい（未取得ならサーバから DL、取得済みなら SKILL.md 書き換えのみ）。
+**設計方針**：基本は `use` だけ知っていれば使える。インストール / 切り替えの状態差はユーザーが意識しなくていい（未取得ならサーバから DL、取得済みなら activation ファイルの上書き生成のみ）。
 
 MVP では `use` 系を実装。`list` / `search` は MVP 対象外（Phase 2 以降）。
 
@@ -82,12 +82,12 @@ MVP では `use` 系を実装。`list` / `search` は MVP 対象外（Phase 2 �
 
 ### 4.1 Claude Code / Codex: `SKILL.md`
 
-frontmatter（`name` / `description`）はそのまま維持し、その下に Heart 本体をインライン埋め込みする。
+SKILL.md には `name: heartcraft` と、常時起動を指示する固定の `description` から成る frontmatter を書き出し、その下に Heart 本体をインライン埋め込みする。
 
 ```markdown
 ---
 name: heartcraft
-description: <常時起動を指示する description（変更なし）>
+description: <常時起動を指示する固定の description>
 ---
 
 # HeartCraftLab Heart Loader (<user>/<name>)
