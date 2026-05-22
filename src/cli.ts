@@ -18,7 +18,7 @@ program
 
 program
   .command('clear')
-  .description('SKILL.md のアクティブ Heart 参照を解除する（配置済みファイルは残す）')
+  .description('アクティブ Heart の activation ファイルを削除する（取得済みキャッシュは残す）')
   .action(clearCommand);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
