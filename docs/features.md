@@ -38,8 +38,8 @@ npx heartcraft use master/zundamon
 | ネットワーク失敗 | `Cannot reach HeartCraftLab API at <url> (...)` | 1 |
 | 404 | `Heart not found: <slug>` | 1 |
 | その他 4xx/5xx | `API error (status): <body>` | 1 |
-| 成功（DL あり） | `✓ <slug> をインストールしました（<description>）` + 配置パス | 0 |
-| 成功（切り替えのみ） | `✓ <slug> に切り替えました` + 配置パス | 0 |
+| 成功（DL あり） | `<name> (<slug>) installed successfully!`（緑）+ 配置先の相対パス | 0 |
+| 成功（切り替えのみ） | `<name> (<slug>) switched!`（緑）+ 配置先の相対パス | 0 |
 
 ### `clear`
 

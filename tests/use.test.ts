@@ -70,8 +70,9 @@ describe('runUse', () => {
     });
 
     expect(result.downloaded).toBe(false);
-    expect(result.name).toBeNull();
-    expect(result.description).toBeNull();
+    // キャッシュ再利用時も frontmatter から name/description を取り出す（switched! 表示に使う）
+    expect(result.name).toBe('ずんだもん');
+    expect(result.description).toBe('明るく元気なずんだもん人格');
     expect(fetchSpy).not.toHaveBeenCalled();
 
     const heart = await readFile(heartPath, 'utf8');

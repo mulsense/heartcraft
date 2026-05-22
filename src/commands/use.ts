@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
+import { relative } from 'node:path';
 import { detectAgents, findCachedHeart, type AgentAdapter } from '../lib/agents.js';
+import { green } from '../lib/color.js';
 import { writeFileEnsureDir } from '../lib/fs.js';
 import { parseSlug } from '../lib/slug.js';
 import { extractDescription, extractName } from '../lib/skill.js';
@@ -31,11 +33,11 @@ export interface UseResult {
   /** サーバから DL が走ったかどうか。 */
   downloaded: boolean;
   /**
-   * DL したときは frontmatter から取り出したキャラクター表示名（heart_prompts.name 相当、例: ずんだもん）。
-   * frontmatter に name が無い場合は空文字。DL スキップ時は null。
+   * frontmatter から取り出したキャラクター表示名（heart_prompts.name 相当、例: ずんだもん）。
+   * DL でもキャッシュ再利用でも heartBody から抽出する。frontmatter に name が無い場合は空文字。
    */
   name: string | null;
-  /** DL したときは frontmatter から取り出した description。DL スキップ時は null。 */
+  /** frontmatter から取り出した description。DL でもキャッシュ再利用でも heartBody から抽出する。 */
   description: string | null;
 }
 
@@ -72,17 +74,17 @@ export async function runUse(opts: UseOptions): Promise<UseResult> {
   const cachedPath = await findCachedHeart(baseDir, slug, agents);
   let heartBody: string;
   let downloaded = false;
-  let name: string | null = null;
-  let description: string | null = null;
 
   if (cachedPath !== null) {
     heartBody = await readFile(cachedPath, 'utf8');
   } else {
     heartBody = await fetchHeart(apiUrl, slug.user, slug.name);
     downloaded = true;
-    name = extractName(heartBody);
-    description = extractDescription(heartBody);
   }
+
+  // name/description は DL でもキャッシュ再利用でも heartBody から取り出す。
+  const name = extractName(heartBody);
+  const description = extractDescription(heartBody);
 
   // 各 agent に Heart ファイル本体 + activation ファイル群を書き出す
   const results: UseAgentResult[] = [];
@@ -120,26 +122,35 @@ export async function runUse(opts: UseOptions): Promise<UseResult> {
   return { agents: results, downloaded, name, description };
 }
 
+/**
+ * use の成功表示を組み立てる pure 関数。
+ * - headline: 1 行目に出す成功メッセージ（色なし）
+ * - paths: 2 行目以降に出す Heart 本体ファイルの相対パス（agent ごとに 1 件）
+ */
+export function formatUseResult(
+  result: UseResult,
+  slug: string,
+  cwd: string,
+): { headline: string; paths: string[] } {
+  // frontmatter に name (キャラクター表示名) があれば「<表示名> (<slug>)」、なければ「<slug>」のみ。
+  const label =
+    result.name !== null && result.name !== '' ? `${result.name} (${slug})` : slug;
+  const verb = result.downloaded ? 'installed successfully!' : 'switched!';
+  return {
+    headline: `${label} ${verb}`,
+    paths: result.agents.map((a) => relative(cwd, a.heartPath)),
+  };
+}
+
 /** commander action 用の薄いラッパー */
 export async function useCommand(slug: string): Promise<void> {
   const result = await runUse({ slug });
+  const { headline, paths } = formatUseResult(result, slug, process.cwd());
 
-  const verb = result.downloaded ? 'インストールしました' : '切り替えました';
-  // DL 時のみ表示名を出す。frontmatter に name (キャラクター表示名) があれば「<表示名> (<slug>)」、なければ「<slug>」のみ。
-  const headline =
-    result.downloaded && result.name !== null && result.name !== ''
-      ? `${result.name} (${slug})`
-      : slug;
-  const descLabel = result.downloaded && result.description !== null && result.description !== ''
-    ? `（${result.description}）`
-    : '';
-  console.log(`✓ ${headline} を ${result.agents.map((a) => a.displayName).join(' / ')} に${verb}${descLabel}`);
-
-  for (const a of result.agents) {
-    console.log(`  [${a.displayName}]`);
-    console.log(`    - ${a.heartPath}`);
-    for (const ap of a.activationPaths) {
-      console.log(`    - ${ap}（アクティブ Heart を更新）`);
-    }
+  // 1 行目: 緑色で成功メッセージ
+  console.log(green(headline));
+  // 2 行目以降: Heart 本体ファイルの配置先（相対パス）
+  for (const path of paths) {
+    console.log(path);
   }
 }

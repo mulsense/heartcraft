@@ -41,7 +41,10 @@ MVP では `use` 系を実装。`list` / `search` は MVP 対象外（Phase 2 �
 5. **各 agent に配置**：検知された agent ごとに
    - Heart 本体 Markdown を agent の heartPath に書き出す（frontmatter 込み）
    - activation ファイル群（agent ごとに 1〜2 個）を書き出す
-6. **成功表示**：DL が走った場合は `✓ <slug> を <Agent1> / <Agent2> にインストールしました（<description>）`、切り替えのみなら `✓ <slug> を <...> に切り替えました` + 各 agent の配置パス
+6. **成功表示**：1 行目に成功メッセージ（TTY 出力時は緑色、`NO_COLOR` で無効化可）、2 行目以降に各 agent の Heart 本体ファイルの配置先を cwd からの相対パスで表示
+   - DL が走った場合：`<name> (<slug>) installed successfully!`
+   - 切り替えのみ（キャッシュ再利用）：`<name> (<slug>) switched!`
+   - `name` が空の場合は `<slug>` のみ
 7. **telemetry 送信（best-effort）**：DL が走った場合のみ `POST ${HEARTCRAFT_API_URL}/api/installs` を fire-and-forget で叩く。失敗・タイムアウト（2秒）しても use 自体は成功扱いで、出力にも現れない。詳細は §10。
 
 ### clear のフロー
@@ -178,9 +181,9 @@ version: 1
 
 - `name` は `heart_prompts.name`（言語別のキャラクター表示名）。
 - `slug` は識別子（`hearts.slug`）。CLI が `<user>/<slug>` を組み立てる際に使うが、CLI 引数として既に渡されているため重複情報として保持される。
-- CLI は `description` と `name` を抽出して成功表示に使う：
-  - `name` が空でない場合：`✓ ずんだもん (tanaka/zundamon) を ... にインストールしました（<description>）`
-  - `name` が空の場合（フォールバック）：`✓ tanaka/zundamon を ... にインストールしました（<description>）`
+- CLI は `name` を抽出して成功表示の 1 行目に使う（DL でもキャッシュ再利用でも抽出する）：
+  - `name` が空でない場合：`ずんだもん (tanaka/zundamon) installed successfully!`
+  - `name` が空の場合（フォールバック）：`tanaka/zundamon installed successfully!`
 
 ---
 
