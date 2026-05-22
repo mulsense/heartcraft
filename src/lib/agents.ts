@@ -34,6 +34,8 @@ export interface AgentAdapter {
    * @param heartBody Heart 本体 Markdown（インライン埋め込みする agent 用）。Claude Code は同ディレクトリ参照で済むため使わない。
    */
   renderActivation(baseDir: string, slug: HeartSlug | null, heartBody: string | null): ActivationFile[];
+  /** clear が削除する activation ファイルの絶対パス群。 */
+  activationPaths(baseDir: string): string[];
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -76,6 +78,9 @@ export const claudeCodeAdapter: AgentAdapter = {
       },
     ];
   },
+  activationPaths(baseDir) {
+    return [resolve(baseDir, CLAUDE_SKILLS_DIR, 'SKILL.md')];
+  },
 };
 
 // ---------- Cursor ----------
@@ -99,6 +104,9 @@ export const cursorAdapter: AgentAdapter = {
         content: renderCursorRule(slug, heartBody),
       },
     ];
+  },
+  activationPaths(baseDir) {
+    return [resolve(baseDir, CURSOR_MDC_PATH)];
   },
 };
 
@@ -127,6 +135,9 @@ export const copilotAdapter: AgentAdapter = {
       },
     ];
   },
+  activationPaths(baseDir) {
+    return [resolve(baseDir, COPILOT_INSTRUCTIONS_PATH)];
+  },
 };
 
 // ---------- Codex ----------
@@ -149,6 +160,9 @@ export const codexAdapter: AgentAdapter = {
         content: renderSkillMd(slug),
       },
     ];
+  },
+  activationPaths(baseDir) {
+    return [resolve(baseDir, CODEX_SKILLS_DIR, 'SKILL.md')];
   },
 };
 
@@ -180,6 +194,12 @@ export const geminiCliAdapter: AgentAdapter = {
         path: resolve(baseDir, GEMINI_CONTEXT_PATH),
         content: renderGeminiMd(slug, heartBody),
       },
+    ];
+  },
+  activationPaths(baseDir) {
+    return [
+      resolve(baseDir, GEMINI_MANIFEST_PATH),
+      resolve(baseDir, GEMINI_CONTEXT_PATH),
     ];
   },
 };

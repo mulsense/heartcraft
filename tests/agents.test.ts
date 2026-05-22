@@ -156,3 +156,38 @@ describe('findCachedHeart', () => {
     expect(result).toBe(cursorPath);
   });
 });
+
+describe('agent adapters - activationPaths', () => {
+  const base = '/tmp/proj';
+
+  it('Claude Code: returns the SKILL.md path', () => {
+    expect(claudeCodeAdapter.activationPaths(base)).toEqual([
+      join(base, '.claude/skills/heartcraft/SKILL.md'),
+    ]);
+  });
+
+  it('Codex: returns the SKILL.md path', () => {
+    expect(codexAdapter.activationPaths(base)).toEqual([
+      join(base, '.codex/skills/heartcraft/SKILL.md'),
+    ]);
+  });
+
+  it('Cursor: returns the .mdc path', () => {
+    expect(cursorAdapter.activationPaths(base)).toEqual([
+      join(base, '.cursor/rules/heartcraft.mdc'),
+    ]);
+  });
+
+  it('Copilot: returns the instructions path', () => {
+    expect(copilotAdapter.activationPaths(base)).toEqual([
+      join(base, '.github/instructions/heartcraft.instructions.md'),
+    ]);
+  });
+
+  it('Gemini CLI: returns the manifest and GEMINI.md paths', () => {
+    expect(geminiCliAdapter.activationPaths(base)).toEqual([
+      join(base, '.gemini/extensions/heartcraft/gemini-extension.json'),
+      join(base, '.gemini/extensions/heartcraft/GEMINI.md'),
+    ]);
+  });
+});
