@@ -1,8 +1,8 @@
 import { detectAgents, type AgentAdapter } from '../lib/agents.js';
-import { writeFileEnsureDir } from '../lib/fs.js';
+import { removeFileIfExists } from '../lib/fs.js';
 
 export interface ClearOptions {
-  /** SKILL.md 等 activation ファイルを書き出すベースディレクトリ。デフォルトは process.cwd()。 */
+  /** activation ファイルを探すベースディレクトリ。デフォルトは process.cwd()。 */
   baseDir?: string;
   /** テスト DI: 検知済 agent を直接渡す。指定したら detectAgents をスキップする。 */
   agents?: readonly AgentAdapter[];
@@ -11,7 +11,8 @@ export interface ClearOptions {
 export interface ClearAgentResult {
   agent: string;
   displayName: string;
-  activationPaths: string[];
+  /** 実際に削除した activation ファイルの絶対パス群。 */
+  deletedPaths: string[];
 }
 
 export interface ClearResult {
@@ -19,8 +20,8 @@ export interface ClearResult {
 }
 
 /**
- * clear サブコマンドの本体。各 agent の activation ファイルを inactive 状態に書き換える。
- * Heart 本体ファイルは残す（再度 use で復帰できるように）。
+ * clear サブコマンドの本体。各 agent の activation ファイルを削除する。
+ * Heart 本体ファイル（取得済みキャッシュ）は残す（再度 use で復帰できるように）。
  */
 export async function runClear(opts: ClearOptions = {}): Promise<ClearResult> {
   const baseDir = opts.baseDir ?? process.cwd();
@@ -28,14 +29,16 @@ export async function runClear(opts: ClearOptions = {}): Promise<ClearResult> {
 
   const results: ClearAgentResult[] = [];
   for (const agent of agents) {
-    const activation = agent.renderActivation(baseDir, null, null);
-    for (const file of activation) {
-      await writeFileEnsureDir(file.path, file.content);
+    const deletedPaths: string[] = [];
+    for (const path of agent.activationPaths(baseDir)) {
+      if (await removeFileIfExists(path)) {
+        deletedPaths.push(path);
+      }
     }
     results.push({
       agent: agent.name,
       displayName: agent.displayName,
-      activationPaths: activation.map((f) => f.path),
+      deletedPaths,
     });
   }
 
@@ -45,11 +48,20 @@ export async function runClear(opts: ClearOptions = {}): Promise<ClearResult> {
 /** commander action 用の薄いラッパー */
 export async function clearCommand(): Promise<void> {
   const result = await runClear();
-  console.log(`✓ ${result.agents.map((a) => a.displayName).join(' / ')} のアクティブなハートプロンプトを解除しました`);
-  for (const a of result.agents) {
+  const cleared = result.agents.filter((a) => a.deletedPaths.length > 0);
+
+  if (cleared.length === 0) {
+    console.log('✓ 解除するアクティブなハートプロンプトはありませんでした');
+    return;
+  }
+
+  console.log(
+    `✓ ${cleared.map((a) => a.displayName).join(' / ')} のアクティブなハートプロンプトを解除しました`,
+  );
+  for (const a of cleared) {
     console.log(`  [${a.displayName}]`);
-    for (const ap of a.activationPaths) {
-      console.log(`    - ${ap}`);
+    for (const p of a.deletedPaths) {
+      console.log(`    - ${p}（削除）`);
     }
   }
 }

@@ -1,8 +1,17 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runClear } from '../src/commands/clear.js';
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 describe('runClear', () => {
   let tmp: string;
@@ -15,51 +24,54 @@ describe('runClear', () => {
     await rm(tmp, { recursive: true, force: true });
   });
 
-  it('writes a SKILL.md with the inactive message when no agent detected (Claude Code fallback)', async () => {
+  it('deletes the SKILL.md of a detected Claude Code project', async () => {
+    const skillMdPath = join(tmp, '.claude/skills/heartcraft/SKILL.md');
+    await mkdir(dirname(skillMdPath), { recursive: true });
+    await writeFile(skillMdPath, '# some skill', 'utf8');
+
     const result = await runClear({ baseDir: tmp });
 
     expect(result.agents).toHaveLength(1);
     expect(result.agents[0].agent).toBe('claude-code');
-    expect(result.agents[0].activationPaths[0]).toBe(
-      join(tmp, '.claude/skills/heartcraft/SKILL.md'),
-    );
-
-    const skill = await readFile(result.agents[0].activationPaths[0], 'utf8');
-    expect(skill).toContain('No Heart is currently active.');
-    expect(skill).not.toMatch(/\*\*[a-z0-9_-]+\/[a-z0-9_-]+\.md\*\*/);
+    expect(result.agents[0].deletedPaths).toEqual([skillMdPath]);
+    expect(await exists(skillMdPath)).toBe(false);
   });
 
-  it('overwrites an existing SKILL.md and leaves Heart files intact', async () => {
+  it('deletes the activation file but leaves Heart cache files intact', async () => {
     const heartPath = join(tmp, '.claude/skills/heartcraft/tanaka/zundamon.md');
     await mkdir(dirname(heartPath), { recursive: true });
     await writeFile(heartPath, 'heart body', 'utf8');
     const skillMdPath = join(tmp, '.claude/skills/heartcraft/SKILL.md');
-    await writeFile(skillMdPath, '*previous skill*', 'utf8');
+    await writeFile(skillMdPath, '# some skill', 'utf8');
 
     await runClear({ baseDir: tmp });
 
-    const skill = await readFile(skillMdPath, 'utf8');
-    expect(skill).toContain('No Heart is currently active.');
-    expect(skill).not.toContain('previous skill');
+    // activation ファイルは削除
+    expect(await exists(skillMdPath)).toBe(false);
+    // 人格本体キャッシュは残す
+    expect(await readFile(heartPath, 'utf8')).toBe('heart body');
+  });
 
-    // 配置済み Heart 本体は残す
-    const heart = await readFile(heartPath, 'utf8');
-    expect(heart).toBe('heart body');
+  it('is idempotent and falls back to Claude Code when nothing exists', async () => {
+    const result = await runClear({ baseDir: tmp });
+
+    expect(result.agents).toHaveLength(1);
+    expect(result.agents[0].agent).toBe('claude-code');
+    expect(result.agents[0].deletedPaths).toEqual([]);
   });
 
   it('clears activation across multiple detected agents', async () => {
-    await mkdir(join(tmp, '.claude'), { recursive: true });
-    await mkdir(join(tmp, '.cursor'), { recursive: true });
+    const skillMdPath = join(tmp, '.claude/skills/heartcraft/SKILL.md');
+    await mkdir(dirname(skillMdPath), { recursive: true });
+    await writeFile(skillMdPath, '# some skill', 'utf8');
+    const mdcPath = join(tmp, '.cursor/rules/heartcraft.mdc');
+    await mkdir(dirname(mdcPath), { recursive: true });
+    await writeFile(mdcPath, '# some rule', 'utf8');
 
     const result = await runClear({ baseDir: tmp });
 
     expect(result.agents.map((a) => a.agent)).toEqual(['claude-code', 'cursor']);
-
-    const skill = await readFile(join(tmp, '.claude/skills/heartcraft/SKILL.md'), 'utf8');
-    expect(skill).toContain('No Heart is currently active.');
-
-    const mdc = await readFile(join(tmp, '.cursor/rules/heartcraft.mdc'), 'utf8');
-    expect(mdc).toContain('No Heart is currently active.');
-    expect(mdc).toContain('alwaysApply: true');
+    expect(await exists(skillMdPath)).toBe(false);
+    expect(await exists(mdcPath)).toBe(false);
   });
 });
