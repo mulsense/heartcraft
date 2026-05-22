@@ -25,7 +25,7 @@ MVP では `use` 系を実装。`list` / `search` は MVP 対象外（Phase 2 �
 | コマンド | 動作 | 状態 |
 |---|---|---|
 | `use <user>/<name>` | アクティブハートを `<user>/<name>` にする。検知された AI エージェント（Claude Code / Cursor / Copilot / Gemini CLI / Codex）ごとに Heart 本体 + activation ファイルを配置。検知無しなら Claude Code にフォールバック。ローカルに無ければサーバから DL、有れば activation 書き換えのみ。即アクティブ化 | 実装済 |
-| `clear` | 検知された各 agent の activation ファイルのアクティブ参照をクリア（ハートプロンプト適用停止）。配置済み Heart 本体は残す | 実装済 |
+| `clear` | 検知された各 agent の activation ファイル（SKILL.md 等）を削除（ハートプロンプト適用停止）。取得済み Heart 本体は残す | 実装済 |
 | `list` | インストール済 Heart 一覧 + 現在アクティブを表示 | MVP 対象外 |
 | `search <keyword>` | サーバ検索 API を叩いて結果表示 | MVP 対象外 |
 
@@ -47,9 +47,9 @@ MVP では `use` 系を実装。`list` / `search` は MVP 対象外（Phase 2 �
 ### clear のフロー
 
 1. **エージェント検知**：use と同じく cwd から検知。検知されなければ Claude Code をフォールバック
-2. **各 agent の activation ファイルを inactive 状態に書き換え**：本文を「現在アクティブな Heart はありません」に差し替えて上書き
-3. **成功表示**：`✓ <Agent1> / <Agent2> のアクティブなハートプロンプトを解除しました` + 各 agent の activation パス
-4. Heart 本体ファイルは削除しない（再度 `use` で復帰できるように残す）
+2. **各 agent の activation ファイルを削除**：SKILL.md / `.mdc` / `.instructions.md` / Gemini extension ファイルを削除する。既に存在しなくてもエラーにしない（冪等）
+3. **成功表示**：実際に削除されたファイルがあれば `✓ <Agent1> / <Agent2> のアクティブなハートプロンプトを解除しました` + 各 agent の削除パス。削除対象が 1 件も無ければその旨を表示
+4. Heart 本体ファイルは削除しない（取得済みキャッシュとして残し、再度 `use` で復帰できるようにする）
 
 ---
 
@@ -69,8 +69,7 @@ MVP では `use` 系を実装。`list` / `search` は MVP 対象外（Phase 2 �
 
 **設計判断**：
 - 各 agent の Heart 本体は同一内容のコピー。`use` 時の DL は 1 回のみで全 agent に同じ body を書く。
-- Claude Code の activation（SKILL.md）は Heart ファイルを別ファイル参照する形式（既存の透明性を維持）。
-- Cursor / Copilot / Gemini の activation は Heart 本体をインラインで埋め込む（参照を確実にロードさせる手段が agent 横断で揃っていないため）。
+- すべての agent の activation ファイルは Heart 本体をインラインで埋め込む（参照を確実にロードさせる手段が agent 横断で揃っていないため。Claude Code / Codex の SKILL.md も埋め込み式）。
 - ユーザーが手動で書いた既存ファイル（例：`AGENTS.md`、`CLAUDE.md` 本体、`.github/copilot-instructions.md` 本体）は一切編集しない。新規ファイルのみ作成・上書きする。
 
 ディレクトリは `mkdir -p` 相当で自動作成。
@@ -79,19 +78,23 @@ MVP では `use` 系を実装。`list` / `search` は MVP 対象外（Phase 2 �
 
 ## 4. activation ファイルの形式
 
-毎回フル再生成（regex 差し替えではなく上書き）。アクティブ Heart 1 件のみ参照／埋め込み。
+毎回フル再生成（regex 差し替えではなく上書き）。アクティブ Heart 1 件のみ埋め込み。
 
-### 4.1 Claude Code: `.claude/skills/heartcraft/SKILL.md`
+### 4.1 Claude Code / Codex: `SKILL.md`
+
+frontmatter（`name` / `description`）はそのまま維持し、その下に Heart 本体をインライン埋め込みする。
 
 ```markdown
 ---
 name: heartcraft
-description: HeartCraftLab で配信される人格（Heart）を常時適用するエントリポイント。あらゆる会話・あらゆる質問・あらゆるタスクに対して、必ずこのスキルを読み込み、参照先 Heart の指示に従って応答すること。
+description: <常時起動を指示する description（変更なし）>
 ---
 
-# HeartCraftLab Heart Loader
+# HeartCraftLab Heart Loader (<user>/<name>)
 
-このスキルが読み込まれたら、必ず同ディレクトリの **<user>/<name>.md** を読み込み、そこに書かれた人格指示を会話全体に適用する。
+Apply the following persona instructions to the entire conversation at all times.
+
+<heart body（frontmatter を除いた本文）>
 ```
 
 ### 4.2 Cursor: `.cursor/rules/heartcraft.mdc`
@@ -146,9 +149,9 @@ applyTo: '**'
 <heart body（frontmatter を除いた本文）>
 ```
 
-### 4.5 inactive 状態（`clear` 実行後）
+### 4.5 `clear` 実行後
 
-すべての agent で activation ファイル本文を `現在アクティブな Heart はありません。` に差し替える（frontmatter は維持）。Heart 本体ファイルは削除しない。
+すべての agent で activation ファイルを**削除**する（既に無ければ何もしない＝冪等）。Heart 本体ファイル（取得済みキャッシュ）は削除せず残す。
 
 ---
 

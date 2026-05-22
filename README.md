@@ -18,7 +18,7 @@ npx heartcraft use master/zundamon
 | コマンド | 動作 |
 |---|---|
 | `npx heartcraft use <user>/<name>` | アクティブハートを `<user>/<name>` にする（必要なら取得 → 配置 → アクティブ化） |
-| `npx heartcraft clear` | アクティブハートを解除（配置済みファイルは残す） |
+| `npx heartcraft clear` | アクティブハートを解除（取得済みの人格ファイルは残す） |
 
 ### MVP 対象外（Phase 2 以降）
 
